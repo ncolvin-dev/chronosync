@@ -29,8 +29,10 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         $errorMessage = "All fields marked with * are required. Please complete the form.";
     } elseif (!filter_var($emailAddress, FILTER_VALIDATE_EMAIL)) {
         $errorMessage = "Please enter a valid email address.";
+        // will also check if email already exists w database
     } elseif (strlen($password) < 8) {
         $errorMessage = "Password must be at least 8 characters long.";
+        //will add more password validation 
     } else {
         // will insert database here
         $successMessage = "Account created successfully. You can now log in.";
