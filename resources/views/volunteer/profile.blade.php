@@ -284,10 +284,10 @@
             <!-- Profile Header -->
             <div class="profile-header">
                 <div class="profile-avatar">
-                    {{ strtoupper(substr(auth()->user()->first_name, 0, 1) . substr(auth()->user()->last_name, 0, 1)) }}
+                    {{ strtoupper(substr($volunteer->first_name, 0, 1) . substr($volunteer->last_name, 0, 1)) }}
                 </div>
-                <h1 class="profile-name">{{ auth()->user()->first_name }} {{ auth()->user()->last_name }}</h1>
-                <p class="profile-email"><i class="fas fa-envelope"></i> {{ auth()->user()->email }}</p>
+                <h1 class="profile-name">{{ $volunteer->first_name }} {{ $volunteer->last_name }}</h1>
+                <p class="profile-email"><i class="fas fa-envelope"></i> {{ $volunteer->email }}</p>
                 <div class="status-badges">
                     <span class="badge badge-success">
                         <i class="fas fa-check-circle"></i> Active
@@ -295,7 +295,7 @@
                     <span class="badge badge-info">
                         <i class="fas fa-calendar"></i> Clean Time:
                         @php
-                            $cleanDate = auth()->user()->clean_date;
+                            $cleanDate = $volunteer->clean_date;
                             $years = \Carbon\Carbon::parse($cleanDate)->diffInYears(\Carbon\Carbon::now());
                             $months = \Carbon\Carbon::parse($cleanDate)->addYears($years)->diffInMonths(\Carbon\Carbon::now());
                         @endphp
@@ -318,37 +318,37 @@
                         <div class="info-row">
                             <div class="info-item">
                                 <div class="info-label">First Name</div>
-                                <div class="info-value">{{ auth()->user()->first_name }}</div>
+                                <div class="info-value">{{ $volunteer->first_name }}</div>
                             </div>
                             <div class="info-item">
                                 <div class="info-label">Last Name</div>
-                                <div class="info-value">{{ auth()->user()->last_name }}</div>
+                                <div class="info-value">{{ $volunteer->last_name }}</div>
                             </div>
                         </div>
                         <div class="info-row">
                             <div class="info-item">
                                 <div class="info-label">Email</div>
-                                <div class="info-value">{{ auth()->user()->email }}</div>
+                                <div class="info-value">{{ $volunteer->email }}</div>
                             </div>
                             <div class="info-item">
                                 <div class="info-label">Phone</div>
-                                <div class="info-value">{{ auth()->user()->phone }}</div>
+                                <div class="info-value">{{ $volunteer->phone }}</div>
                             </div>
                         </div>
                         <div class="info-row">
                             <div class="info-item">
                                 <div class="info-label">Date of Birth</div>
-                                <div class="info-value">{{ \Carbon\Carbon::parse(auth()->user()->date_of_birth)->format('M d, Y') }}</div>
+                                <div class="info-value">{{ \Carbon\Carbon::parse($volunteer->dob)->format('M d, Y') }}</div>
                             </div>
                             <div class="info-item">
                                 <div class="info-label">Gender</div>
-                                <div class="info-value">{{ ucfirst(auth()->user()->gender) }}</div>
+                                <div class="info-value">{{ ucfirst($volunteer->gender) }}</div>
                             </div>
                         </div>
                         <div class="info-row">
                             <div class="info-item">
                                 <div class="info-label">Clean Date</div>
-                                <div class="info-value">{{ \Carbon\Carbon::parse(auth()->user()->clean_date)->format('M d, Y') }}</div>
+                                <div class="info-value">{{ \Carbon\Carbon::parse($volunteer->clean_date)->format('M d, Y') }}</div>
                             </div>
                         </div>
                         <button class="edit-button-inline" data-edit-section="personal-info">
@@ -362,43 +362,43 @@
 
                         <div class="form-group">
                             <label for="first_name" class="form-label">First Name</label>
-                            <input type="text" class="form-control" id="first_name" name="first_name" value="{{ auth()->user()->first_name }}" required>
+                            <input type="text" class="form-control" id="first_name" name="first_name" value="{{ $volunteer->first_name }}" required>
                         </div>
 
                         <div class="form-group">
                             <label for="last_name" class="form-label">Last Name</label>
-                            <input type="text" class="form-control" id="last_name" name="last_name" value="{{ auth()->user()->last_name }}" required>
+                            <input type="text" class="form-control" id="last_name" name="last_name" value="{{ $volunteer->last_name }}" required>
                         </div>
 
                         <div class="form-group">
                             <label for="email" class="form-label">Email</label>
-                            <input type="email" class="form-control" id="email" name="email" value="{{ auth()->user()->email }}" required>
+                            <input type="email" class="form-control" id="email" name="email" value="{{ $volunteer->email }}" required>
                         </div>
 
                         <div class="form-group">
                             <label for="phone" class="form-label">Phone</label>
-                            <input type="tel" class="form-control" id="phone" name="phone" value="{{ auth()->user()->phone }}" required>
+                            <input type="tel" class="form-control" id="phone" name="phone" value="{{ $volunteer->phone }}" required>
                         </div>
 
                         <div class="form-group">
                             <label for="date_of_birth" class="form-label">Date of Birth</label>
-                            <input type="date" class="form-control" id="date_of_birth" name="date_of_birth" value="{{ auth()->user()->date_of_birth }}" required>
+                            <input type="date" class="form-control" id="date_of_birth" name="date_of_birth" value="{{ $volunteer->dob }}" required>
                         </div>
 
                         <div class="form-group">
                             <label for="gender" class="form-label">Gender</label>
                             <select class="form-select" id="gender" name="gender" required>
-                                <option value="male" {{ auth()->user()->gender === 'male' ? 'selected' : '' }}>Male</option>
-                                <option value="female" {{ auth()->user()->gender === 'female' ? 'selected' : '' }}>Female</option>
-                                <option value="non-binary" {{ auth()->user()->gender === 'non-binary' ? 'selected' : '' }}>Non-Binary</option>
-                                <option value="transgender" {{ auth()->user()->gender === 'transgender' ? 'selected' : '' }}>Transgender</option>
-                                <option value="prefer-not-to-say" {{ auth()->user()->gender === 'prefer-not-to-say' ? 'selected' : '' }}>Prefer Not to Say</option>
+                                <option value="male" {{ $volunteer->gender === 'male' ? 'selected' : '' }}>Male</option>
+                                <option value="female" {{ $volunteer->gender === 'female' ? 'selected' : '' }}>Female</option>
+                                <option value="non-binary" {{ $volunteer->gender === 'non-binary' ? 'selected' : '' }}>Non-Binary</option>
+                                <option value="transgender" {{ $volunteer->gender === 'transgender' ? 'selected' : '' }}>Transgender</option>
+                                <option value="prefer-not-to-say" {{ $volunteer->gender === 'prefer-not-to-say' ? 'selected' : '' }}>Prefer Not to Say</option>
                             </select>
                         </div>
 
                         <div class="form-group">
                             <label for="clean_date" class="form-label">Clean Date</label>
-                            <input type="date" class="form-control" id="clean_date" name="clean_date" value="{{ auth()->user()->clean_date }}" required>
+                            <input type="date" class="form-control" id="clean_date" name="clean_date" value="{{ $volunteer->clean_date }}" required>
                         </div>
 
                         <div class="button-group">
@@ -427,11 +427,11 @@
                         <div class="info-row">
                             <div class="info-item">
                                 <div class="info-label">Neighborhood</div>
-                                <div class="info-value">{{ auth()->user()->neighborhood ?? 'Not provided' }}</div>
+                                <div class="info-value">{{ $volunteer->neighborhood ?? 'Not provided' }}</div>
                             </div>
                             <div class="info-item">
                                 <div class="info-label">Primary Bus Line</div>
-                                <div class="info-value">{{ auth()->user()->bus_line ?? 'Not provided' }}</div>
+                                <div class="info-value">{{ $volunteer->bus_line ?? 'Not provided' }}</div>
                             </div>
                         </div>
                         <button class="edit-button-inline" data-edit-section="transportation">
@@ -445,12 +445,12 @@
 
                         <div class="form-group">
                             <label for="neighborhood" class="form-label">Neighborhood</label>
-                            <input type="text" class="form-control" id="neighborhood" name="neighborhood" value="{{ auth()->user()->neighborhood }}" placeholder="e.g., Downtown, Eastside">
+                            <input type="text" class="form-control" id="neighborhood" name="neighborhood" value="{{ $volunteer->neighborhood }}" placeholder="e.g., Downtown, Eastside">
                         </div>
 
                         <div class="form-group">
                             <label for="bus_line" class="form-label">Primary Bus Line</label>
-                            <input type="text" class="form-control" id="bus_line" name="bus_line" value="{{ auth()->user()->bus_line }}" placeholder="e.g., Line 5, Line 12">
+                            <input type="text" class="form-control" id="bus_line" name="bus_line" value="{{ $volunteer->bus_line }}" placeholder="e.g., Line 5, Line 12">
                         </div>
 
                         <div class="button-group">
@@ -480,10 +480,10 @@
                             <div class="info-item">
                                 <div class="info-label">Treatment Facility Experience</div>
                                 <div class="info-value">
-                                    @if(auth()->user()->has_treatment_facility)
+                                    @if($volunteer->treatment_facility)
                                         <span class="badge badge-success">Yes</span>
-                                        @if(auth()->user()->treatment_facility_name)
-                                            <div style="margin-top: 0.5rem; font-size: 0.9rem;">{{ auth()->user()->treatment_facility_name }}</div>
+                                        @if($volunteer->facility_name)
+                                            <div style="margin-top: 0.5rem; font-size: 0.9rem;">{{ $volunteer->facility_name }}</div>
                                         @endif
                                     @else
                                         <span class="badge" style="background-color: #6c757d; color: white;">No</span>
@@ -514,19 +514,19 @@
                             <label class="form-label">Treatment Facility Experience</label>
                             <div>
                                 <div class="form-check">
-                                    <input type="radio" class="form-check-input" id="has_treatment_yes" name="has_treatment_facility" value="1" {{ auth()->user()->has_treatment_facility ? 'checked' : '' }}>
+                                    <input type="radio" class="form-check-input" id="has_treatment_yes" name="has_treatment_facility" value="1" {{ $volunteer->treatment_facility ? 'checked' : '' }}>
                                     <label class="form-check-label" for="has_treatment_yes">Yes</label>
                                 </div>
                                 <div class="form-check">
-                                    <input type="radio" class="form-check-input" id="has_treatment_no" name="has_treatment_facility" value="0" {{ !auth()->user()->has_treatment_facility ? 'checked' : '' }}>
+                                    <input type="radio" class="form-check-input" id="has_treatment_no" name="has_treatment_facility" value="0" {{ !$volunteer->treatment_facility ? 'checked' : '' }}>
                                     <label class="form-check-label" for="has_treatment_no">No</label>
                                 </div>
                             </div>
                         </div>
 
-                        <div class="form-group" id="treatment-detail-field" style="display: {{ auth()->user()->has_treatment_facility ? 'block' : 'none' }};">
+                        <div class="form-group" id="treatment-detail-field" style="display: {{ $volunteer->treatment_facility ? 'block' : 'none' }};">
                             <label for="treatment_facility_name" class="form-label">Facility Name</label>
-                            <input type="text" class="form-control" id="treatment_facility_name" name="treatment_facility_name" value="{{ auth()->user()->treatment_facility_name }}">
+                            <input type="text" class="form-control" id="treatment_facility_name" name="treatment_facility_name" value="{{ $volunteer->facility_name }}">
                         </div>
 
                         <div class="form-group">

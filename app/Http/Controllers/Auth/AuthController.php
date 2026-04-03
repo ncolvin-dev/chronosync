@@ -51,7 +51,7 @@ class AuthController extends Controller
         session(['last_activity' => time()]);
 
         return redirect()->route('dashboard')
-            ->with('success', 'Welcome back, ' . $user->name . '!');
+            ->with('success', 'Welcome back!');
     }
 
     /**

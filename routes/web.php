@@ -49,7 +49,12 @@ Route::post('/sms/webhook/response', [SmsController::class, 'handleResponse'])->
 Route::middleware(['auth', 'session_timeout'])->group(function () {
     // Dashboard
     Route::get('/', function () {
-        return view('coordinator.dashboard');
+        $user = auth()->user();
+        $roles = is_array($user->roles) ? $user->roles : json_decode($user->roles, true) ?? [];
+        if (in_array('admin', $roles) || in_array('coordinator', $roles)) {
+            return view('coordinator.dashboard');
+        }
+        return view('volunteer.dashboard');
     })->name('dashboard');
     Route::redirect('/home', '/')->name('home');
 
@@ -308,9 +313,54 @@ Route::redirect('/coordinator/sms-config', '/sms/configure')->name('coordinator.
 
 // Volunteer route aliases
 Route::redirect('/volunteer/dashboard', '/')->name('volunteer.dashboard');
-Route::redirect('/volunteer/profile', '/volunteers/{id}')->name('volunteer.profile');
-Route::redirect('/volunteer/availability', '/volunteers/{id}/availability')->name('volunteer.availability');
-Route::redirect('/volunteer/assignments', '/volunteers/{id}/meetings')->name('volunteer.assignments');
+Route::get('/volunteer/profile', function() {
+    $volunteer = \App\Models\Volunteer::where('email', auth()->user()->email)->first();
+    if (!$volunteer) {
+        return redirect()->route('dashboard')->with('error', 'No volunteer record linked to your account.');
+    }
+    return redirect("/volunteers/{$volunteer->volunteer_id}");
+})->middleware(['auth', 'session_timeout'])->name('volunteer.profile');
+
+Route::post('/volunteer/profile/update', function(\Illuminate\Http\Request $request) {
+    $volunteer = \App\Models\Volunteer::where('email', auth()->user()->email)->first();
+    if (!$volunteer) {
+        return redirect()->route('dashboard')->with('error', 'No volunteer record linked to your account.');
+    }
+    $validated = $request->validate([
+        'first_name'  => 'sometimes|string|max:255',
+        'last_name'   => 'sometimes|string|max:255',
+        'phone'       => 'sometimes|string|max:20',
+        'dob'         => 'sometimes|date',
+        'date_of_birth' => 'sometimes|date',
+        'gender'      => 'sometimes|string|max:50',
+        'clean_date'  => 'sometimes|date',
+        'neighborhood'=> 'sometimes|nullable|string|max:255',
+        'bus_line'    => 'sometimes|nullable|string|max:255',
+    ]);
+    // Map date_of_birth → dob if submitted that way
+    if (isset($validated['date_of_birth']) && !isset($validated['dob'])) {
+        $validated['dob'] = $validated['date_of_birth'];
+        unset($validated['date_of_birth']);
+    }
+    $volunteer->fill($validated)->save();
+    return redirect("/volunteers/{$volunteer->volunteer_id}")->with('success', 'Profile updated successfully.');
+})->middleware(['auth', 'session_timeout'])->name('volunteer.profile.update');
+
+Route::get('/volunteer/availability', function() {
+    $volunteer = \App\Models\Volunteer::where('email', auth()->user()->email)->first();
+    if (!$volunteer) {
+        return redirect()->route('dashboard')->with('error', 'No volunteer record linked to your account.');
+    }
+    return redirect("/volunteers/{$volunteer->volunteer_id}/availability");
+})->middleware(['auth', 'session_timeout'])->name('volunteer.availability');
+
+Route::get('/volunteer/assignments', function() {
+    $volunteer = \App\Models\Volunteer::where('email', auth()->user()->email)->first();
+    if (!$volunteer) {
+        return redirect()->route('dashboard')->with('error', 'No volunteer record linked to your account.');
+    }
+    return redirect("/volunteers/{$volunteer->volunteer_id}/meetings");
+})->middleware(['auth', 'session_timeout'])->name('volunteer.assignments');
 
 // Profile and reports aliases
 Route::redirect('/profile/edit', '/')->name('profile.edit');
