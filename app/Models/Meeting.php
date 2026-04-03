@@ -1,6 +1,6 @@
 <?php
 
-declare(strict_types=1);
+declare(straight_types=1);
 
 namespace App\Models;
 
@@ -9,153 +9,253 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\SoftDeletes;
 
 /**
- * Meeting Model — Recurring Meeting Slot
+ * Meeting Model
  *
- * Represents a recurring H&I meeting at a facility, defined by which
- * week of the month and day of the week it occurs. Individual occurrences
- * are covered by MeetingAssignment records that link a volunteer to a
- * specific calendar date.
+ * Represents scheduled H&I meetings at facilities.
  *
  * @property string $meeting_id
  * @property string $facility_id
- * @property int $day_of_week        0=Sunday through 6=Saturday
- * @property int $week_of_month      1-4 = specific week, 5 = last week
- * @property string $meeting_time    HH:MM:SS
- * @property int $duration_minutes
- * @property string $format          in_person | virtual | hybrid
- * @property int $volunteers_needed  1-5
- * @property string $status          active | inactive
+ * @property \Carbon\Carbon $meeting_date
+ * @property string $meeting_time
+ * @property string $format
+ * @property string $status
+ * @property string|null $assigned_volunteer_id
+ * @property string $confirmed_status
  * @property string|null $notes
+ * @property \Carbon\Carbon|null $completed_at
+ * @property int $week_of_month
+ * @property int $day_of_week
  * @property \Carbon\Carbon $created_at
  * @property \Carbon\Carbon $updated_at
- * @property \Carbon\Carbon|null $deleted_at
  */
 class Meeting extends Model
 {
-    use HasFactory, HasUlids, SoftDeletes;
+    use HasFactory, HasUlids;
 
     protected $primaryKey = 'meeting_id';
 
     protected $fillable = [
         'facility_id',
-        'day_of_week',
-        'week_of_month',
+        'meeting_date',
         'meeting_time',
-        'duration_minutes',
         'format',
-        'volunteers_needed',
         'status',
+        'assigned_volunteer_id',
+        'confirmed_status',
         'notes',
+        'completed_at',
+        'week_of_month',
+        'day_of_week',
     ];
 
     protected $casts = [
-        'day_of_week'       => 'integer',
-        'week_of_month'     => 'integer',
-        'duration_minutes'  => 'integer',
-        'volunteers_needed' => 'integer',
+        'meeting_date' => 'date',
+        'completed_at' => 'datetime',
     ];
 
     /**
-     * Human-readable day names.
+     * Get the datetime combination of meeting date and time.
+     *
+     * @return Carbon
      */
-    public const DAY_NAMES = [
-        0 => 'Sunday',
-        1 => 'Monday',
-        2 => 'Tuesday',
-        3 => 'Wednesday',
-        4 => 'Thursday',
-        5 => 'Friday',
-        6 => 'Saturday',
-    ];
-
-    /**
-     * Human-readable week labels.
-     */
-    public const WEEK_LABELS = [
-        1 => '1st',
-        2 => '2nd',
-        3 => '3rd',
-        4 => '4th',
-        5 => 'Last',
-    ];
-
-    /**
-     * Get a human-readable label for this recurring slot.
-     * E.g., "Every 2nd Tuesday at 7:00 PM"
-     */
-    public function getScheduleLabelAttribute(): string
+    public function getMeetingDateTimeAttribute(): Carbon
     {
-        $week = self::WEEK_LABELS[$this->week_of_month] ?? $this->week_of_month;
-        $day  = self::DAY_NAMES[$this->day_of_week] ?? $this->day_of_week;
-        $time = $this->meeting_time
-            ? Carbon::parse($this->meeting_time)->format('g:i A')
-            : '';
-
-        return "Every {$week} {$day}" . ($time ? " at {$time}" : '');
+        return Carbon::parse("{$this->meeting_date} {$this->meeting_time}");
     }
 
     /**
-     * Compute the calendar date of the next upcoming occurrence.
-     * Returns null if the pattern cannot resolve (e.g., week 5 in a
-     * month that only has 4 of that weekday).
+     * Check if meeting is scheduled.
+     *
+     * @return bool
      */
-    public function nextOccurrence(): ?Carbon
+    public function isScheduled(): bool
     {
-        return $this->occurrenceInMonth(now()->year, now()->month)
-            ?? $this->occurrenceInMonth(now()->addMonth()->year, now()->addMonth()->month);
+        return $this->status === 'scheduled';
     }
 
     /**
-     * Compute the occurrence date for a given year/month.
+     * Check if meeting is completed.
+     *
+     * @return bool
      */
-    public function occurrenceInMonth(int $year, int $month): ?Carbon
+    public function isCompleted(): bool
     {
-        $target = $this->day_of_week; // 0-6
-
-        // Find the first day of the month that matches day_of_week
-        $first = Carbon::create($year, $month, 1);
-        $diff  = ($target - $first->dayOfWeek + 7) % 7;
-        $firstOccurrence = $first->copy()->addDays($diff);
-
-        if ($this->week_of_month <= 4) {
-            $date = $firstOccurrence->copy()->addWeeks($this->week_of_month - 1);
-        } else {
-            // "Last" occurrence: start from the next month's first, go back to find last
-            $nextFirst = Carbon::create($year, $month, 1)->addMonth();
-            $nextDiff  = ($target - $nextFirst->dayOfWeek + 7) % 7;
-            // The last occurrence is 7 days before the first occurrence of the next month
-            $date = $nextFirst->copy()->addDays($nextDiff)->subWeek();
-        }
-
-        // Guard against month overflow (e.g., week 5 doesn't exist for this weekday)
-        if ($date->month !== $month) {
-            return null;
-        }
-
-        return $date;
+        return $this->status === 'completed';
     }
 
     /**
-     * Scope: Active meeting slots only.
+     * Check if meeting is cancelled.
+     *
+     * @return bool
      */
-    public function scopeActive(Builder $query): Builder
+    public function isCancelled(): bool
     {
-        return $query->where('status', 'active');
+        return $this->status === 'cancelled';
     }
 
     /**
-     * Scope: Filter by format.
+     * Check if meeting has a confirmed volunteer.
+     *
+     * @return bool
      */
-    public function scopeFormat(Builder $query, string $format): Builder
+    public function hasConfirmedVolunteer(): bool
     {
-        return $query->where('format', $format);
+        return $this->confirmed_status === 'confirmed' && $this->assigned_volunteer_id !== null;
     }
 
     /**
-     * Relationship: Facility hosting this recurring meeting.
+     * Check if meeting is virtual.
+     *
+     * @return bool
+     */
+    public function isVirtual(): bool
+    {
+        return $this->format === 'virtual';
+    }
+
+    /**
+     * Check if meeting is in-person.
+     *
+     * @return bool
+     */
+    public function isInPerson(): bool
+    {
+        return $this->format === 'in_person';
+    }
+
+    /**
+     * Check if meeting is upcoming (not completed or cancelled).
+     *
+     * @return bool
+     */
+    public function isUpcoming(): bool
+    {
+        return $this->isScheduled() && $this->meeting_date >= now()->date();
+    }
+
+    /**
+     * Scope: Get scheduled meetings.
+     *
+     * @param Builder $query
+     * @return Builder
+     */
+    public function scopeScheduled(Builder $query): Builder
+    {
+        return $query->where('status', 'scheduled');
+    }
+
+    /**
+     * Scope: Get completed meetings.
+     *
+     * @param Builder $query
+     * @return Builder
+     */
+    public function scopeCompleted(Builder $query): Builder
+    {
+        return $query->where('status', 'completed');
+    }
+
+    /**
+     * Scope: Get cancelled meetings.
+     *
+     * @param Builder $query
+     * @return Builder
+     */
+    public function scopeCancelled(Builder $query): Builder
+    {
+        return $query->where('status', 'cancelled');
+    }
+
+    /**
+     * Scope: Get upcoming meetings.
+     *
+     * @param Builder $query
+     * @return Builder
+     */
+    public function scopeUpcoming(Builder $query): Builder
+    {
+        return $query->scheduled()
+            ->where('meeting_date', '>=', now()->date());
+    }
+
+    /**
+     * Scope: Get meetings on a specific date.
+     *
+     * @param Builder $query
+     * @param Carbon $date
+     * @return Builder
+     */
+    public function scopeOnDate(Builder $query, Carbon $date): Builder
+    {
+        return $query->where('meeting_date', $date->toDateString());
+    }
+
+    /**
+     * Scope: Get meetings in a date range.
+     *
+     * @param Builder $query
+     * @param Carbon $startDate
+     * @param Carbon $endDate
+     * @return Builder
+     */
+    public function scopeDateBetween(Builder $query, Carbon $startDate, Carbon $endDate): Builder
+    {
+        return $query->whereBetween('meeting_date', [
+            $startDate->toDateString(),
+            $endDate->toDateString(),
+        ]);
+    }
+
+    /**
+     * Scope: Get meetings with confirmed volunteers.
+     *
+     * @param Builder $query
+     * @return Builder
+     */
+    public function scopeConfirmed(Builder $query): Builder
+    {
+        return $query->where('confirmed_status', 'confirmed');
+    }
+
+    /**
+     * Scope: Get unassigned meetings.
+     *
+     * @param Builder $query
+     * @return Builder
+     */
+    public function scopeUnassigned(Builder $query): Builder
+    {
+        return $query->whereNull('assigned_volunteer_id');
+    }
+
+    /**
+     * Scope: Get virtual meetings.
+     *
+     * @param Builder $query
+     * @return Builder
+     */
+    public function scopeVirtual(Builder $query): Builder
+    {
+        return $query->where('format', 'virtual');
+    }
+
+    /**
+     * Scope: Get in-person meetings.
+     *
+     * @param Builder $query
+     * @return Builder
+     */
+    public function scopeInPerson(Builder $query): Builder
+    {
+        return $query->where('format', 'in_person');
+    }
+
+    /**
+     * Relationship: Facility hosting this meeting.
+     *
+     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
      */
     public function facility()
     {
@@ -163,41 +263,19 @@ class Meeting extends Model
     }
 
     /**
-     * Relationship: All assignments across all occurrences.
+     * Relationship: Assigned volunteer.
+     *
+     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
      */
-    public function assignments()
+    public function assignedVolunteer()
     {
-        return $this->hasMany(MeetingAssignment::class, 'meeting_id', 'meeting_id');
+        return $this->belongsTo(Volunteer::class, 'assigned_volunteer_id', 'volunteer_id');
     }
 
     /**
-     * Relationship: Assignments for a specific calendar date.
-     */
-    public function assignmentsForDate(string $date)
-    {
-        return $this->assignments()->where('assignment_date', $date);
-    }
-
-    /**
-     * Relationship: Active (confirmed + pending) assignments for a date.
-     */
-    public function activeAssignmentsForDate(string $date)
-    {
-        return $this->assignmentsForDate($date)
-            ->whereIn('status', ['confirmed', 'pending_confirmation']);
-    }
-
-    /**
-     * Check whether a given occurrence date still needs more volunteers.
-     */
-    public function needsVolunteersForDate(string $date): bool
-    {
-        $assigned = $this->activeAssignmentsForDate($date)->count();
-        return $assigned < $this->volunteers_needed;
-    }
-
-    /**
-     * Relationship: SMS logs tied to this meeting.
+     * Relationship: SMS logs for this meeting.
+     *
+     * @return \Illuminate\Database\Eloquent\Relations\HasMany
      */
     public function smsLogs()
     {

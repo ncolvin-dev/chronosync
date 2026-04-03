@@ -322,7 +322,7 @@
             </div>
 
             <!-- Availability Grids -->
-            <form method="POST" action="{{ route('availability.update', $volunteer) }}" id="availabilityForm">
+            <form method="POST" action="{{ route('volunteer.availability.store') }}" id="availabilityForm">
                 @csrf
 
                 @for($week = 1; $week <= 5; $week++)
@@ -349,7 +349,7 @@
                                         @for($day = 0; $day < 7; $day++)
                                             @php
                                                 $cellId = "availability_week{$week}_day{$day}_hour{$hour}";
-                                                $isAvailable = isset($slots["{$week}-{$day}-{$hour}"]);
+                                                $isAvailable = false; // Load from database
                                             @endphp
                                             <div class="grid-cell {{ $isAvailable ? 'available' : 'unavailable' }}"
                                                  data-week="{{ $week }}"
