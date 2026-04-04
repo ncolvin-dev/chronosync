@@ -363,5 +363,7 @@ Route::get('/volunteer/assignments', function() {
 })->middleware(['auth', 'session_timeout'])->name('volunteer.assignments');
 
 // Profile and reports aliases
-Route::redirect('/profile/edit', '/')->name('profile.edit');
+Route::get('/settings', function () {
+    return view('settings');
+})->middleware(['auth', 'session_timeout'])->name('profile.edit');
 Route::redirect('/reports/coverage', '/reports/coverage-summary')->name('reports.coverage');
