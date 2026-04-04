@@ -155,29 +155,29 @@ Route::middleware(['auth', 'session_timeout'])->group(function () {
         Route::get('/meetings/{meeting}', [MeetingController::class, 'show'])
             ->name('meetings.show');
 
-        // Automatic matching
+        // Deactivate / reactivate / delete recurring meeting slots
+        Route::post('/meetings/{meeting}/deactivate', [MeetingController::class, 'deactivate'])
+            ->name('meetings.deactivate');
+        Route::post('/meetings/{meeting}/activate', [MeetingController::class, 'activate'])
+            ->name('meetings.activate');
+        Route::delete('/meetings/{meeting}', [MeetingController::class, 'destroy'])
+            ->name('meetings.destroy');
+
+        // Assign a volunteer to a specific occurrence
         Route::post('/meetings/{meeting}/assign', [MeetingController::class, 'assign'])
             ->name('meetings.assign');
-
-        // Manual assignment with override
-        Route::post('/meetings/{meeting}/manual-assign', [MeetingController::class, 'manualAssign'])
-            ->name('meetings.manual-assign');
-
-        // Unassign volunteer
-        Route::post('/meetings/{meeting}/unassign', [MeetingController::class, 'unassign'])
-            ->name('meetings.unassign');
-
-        // Complete meeting
-        Route::post('/meetings/{meeting}/complete', [MeetingController::class, 'complete'])
-            ->name('meetings.complete');
-
-        // Cancel meeting
-        Route::post('/meetings/{meeting}/cancel', [MeetingController::class, 'cancel'])
-            ->name('meetings.cancel');
 
         // Send reminder SMS
         Route::post('/meetings/{meeting}/send-reminder', [SmsController::class, 'sendReminder'])
             ->name('meetings.send-reminder');
+
+        // Confirm / decline / cancel an assignment
+        Route::post('/meeting-assignments/{meetingAssignment}/confirm', [MeetingController::class, 'confirmAssignment'])
+            ->name('meeting-assignments.confirm');
+        Route::post('/meeting-assignments/{meetingAssignment}/decline', [MeetingController::class, 'declineAssignment'])
+            ->name('meeting-assignments.decline');
+        Route::post('/meeting-assignments/{meetingAssignment}/cancel', [MeetingController::class, 'cancelAssignment'])
+            ->name('meeting-assignments.cancel');
     });
 
     /*

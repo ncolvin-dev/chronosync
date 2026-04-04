@@ -268,15 +268,78 @@
         background-color: #f8f9fa;
     }
 
+    .meeting-slot {
+        background: white;
+        border: 1px solid #e0e0e0;
+        border-radius: 0.5rem;
+        padding: 1rem;
+        margin-bottom: 1rem;
+        position: relative;
+    }
+
+    .meeting-slot:last-child {
+        margin-bottom: 0;
+    }
+
+    .meeting-slot-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 0.75rem;
+        font-weight: 600;
+        color: #003366;
+        font-size: 0.875rem;
+    }
+
+    .btn-remove-slot {
+        background: none;
+        border: 1px solid #dc3545;
+        color: #dc3545;
+        padding: 0.25rem 0.6rem;
+        border-radius: 0.4rem;
+        font-size: 0.75rem;
+        cursor: pointer;
+        font-weight: 600;
+    }
+
+    .btn-remove-slot:hover {
+        background-color: #dc3545;
+        color: white;
+    }
+
     .schedule-row {
         display: grid;
         grid-template-columns: 1fr 1fr 1fr;
         gap: 1rem;
-        margin-bottom: 1rem;
+        margin-bottom: 0.75rem;
     }
 
-    .schedule-row:last-child {
-        margin-bottom: 0;
+    .schedule-row-wide {
+        display: grid;
+        grid-template-columns: 1fr 1fr 1fr 1fr;
+        gap: 1rem;
+    }
+
+    .btn-add-slot {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        background: none;
+        border: 2px dashed #0099cc;
+        color: #0099cc;
+        padding: 0.6rem 1.2rem;
+        border-radius: 0.5rem;
+        font-size: 0.875rem;
+        font-weight: 600;
+        cursor: pointer;
+        margin-top: 0.75rem;
+        width: 100%;
+        justify-content: center;
+        transition: all 0.2s;
+    }
+
+    .btn-add-slot:hover {
+        background-color: #e8f7fc;
     }
 
     .btn-primary {
@@ -631,39 +694,20 @@
                     <label for="probation_allowed">Allow Volunteers on Probation</label>
                 </div>
 
-                <!-- Meeting Schedule -->
-                <h4 style="margin: 1.5rem 0 1rem; color: #003366; font-weight: 600;">Meeting Schedule</h4>
+                <!-- Meeting Schedule — multiple recurring slots -->
+                <h4 style="margin: 1.5rem 0 0.5rem; color: #003366; font-weight: 600;">Meeting Schedule</h4>
+                <p style="font-size: 0.8rem; color: #666; margin-bottom: 1rem;">
+                    Add one or more recurring meeting slots for this facility. Each slot defines when the meeting happens
+                    each month and how many volunteers it needs (up to 5).
+                </p>
 
-                <div class="schedule-builder">
-                    <div class="schedule-row">
-                        <div class="form-group">
-                            <label for="meeting_week" class="form-label">Week of Month</label>
-                            <select class="form-select" id="meeting_week" name="meeting_week">
-                                <option value="1">Week 1</option>
-                                <option value="2">Week 2</option>
-                                <option value="3">Week 3</option>
-                                <option value="4">Week 4</option>
-                                <option value="5">Week 5</option>
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label for="meeting_day" class="form-label">Day of Week</label>
-                            <select class="form-select" id="meeting_day" name="meeting_day">
-                                <option value="monday">Monday</option>
-                                <option value="tuesday">Tuesday</option>
-                                <option value="wednesday">Wednesday</option>
-                                <option value="thursday">Thursday</option>
-                                <option value="friday">Friday</option>
-                                <option value="saturday">Saturday</option>
-                                <option value="sunday">Sunday</option>
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label for="meeting_time" class="form-label">Meeting Time</label>
-                            <input type="time" class="form-control" id="meeting_time" name="meeting_time">
-                        </div>
-                    </div>
+                <div class="schedule-builder" id="meetingSlotsContainer">
+                    <!-- Slots are injected here by JavaScript; first one added on page load -->
                 </div>
+
+                <button type="button" class="btn-add-slot" id="addMeetingSlotBtn" onclick="addMeetingSlot()">
+                    <i class="fas fa-plus-circle"></i> Add Another Meeting Slot
+                </button>
 
                 <div class="checkbox-item">
                     <input type="checkbox" id="active" name="active" checked>
@@ -683,9 +727,113 @@
 
 @section('extra-scripts')
 <script>
+    // -------------------------------------------------------------------------
+    // Meeting slot builder — dynamic, supports multiple recurring slots
+    // -------------------------------------------------------------------------
+    let slotCount = 0;
+
+    function buildSlotHTML(index) {
+        return `
+        <div class="meeting-slot" id="slot-${index}">
+            <div class="meeting-slot-header">
+                <span><i class="fas fa-clock"></i> Meeting Slot #${index + 1}</span>
+                <button type="button" class="btn-remove-slot" onclick="removeSlot(${index})" title="Remove this slot">
+                    <i class="fas fa-times"></i> Remove
+                </button>
+            </div>
+
+            <div class="schedule-row">
+                <div class="form-group">
+                    <label class="form-label">Week of Month *</label>
+                    <select class="form-select" name="meetings[${index}][week_of_month]" required>
+                        <option value="1">1st</option>
+                        <option value="2">2nd</option>
+                        <option value="3">3rd</option>
+                        <option value="4">4th</option>
+                        <option value="5">Last</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Day of Week *</label>
+                    <select class="form-select" name="meetings[${index}][day_of_week]" required>
+                        <option value="0">Sunday</option>
+                        <option value="1">Monday</option>
+                        <option value="2">Tuesday</option>
+                        <option value="3">Wednesday</option>
+                        <option value="4">Thursday</option>
+                        <option value="5">Friday</option>
+                        <option value="6">Saturday</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Time *</label>
+                    <input type="time" class="form-control" name="meetings[${index}][meeting_time]" required>
+                </div>
+            </div>
+
+            <div class="schedule-row-wide">
+                <div class="form-group">
+                    <label class="form-label">Duration (min)</label>
+                    <input type="number" class="form-control" name="meetings[${index}][duration_minutes]"
+                           value="60" min="15" max="480" step="15">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Format *</label>
+                    <select class="form-select" name="meetings[${index}][format]" required>
+                        <option value="in_person">In Person</option>
+                        <option value="virtual">Virtual</option>
+                        <option value="hybrid">Hybrid</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Volunteers Needed *</label>
+                    <select class="form-select" name="meetings[${index}][volunteers_needed]" required>
+                        <option value="1">1</option>
+                        <option value="2">2</option>
+                        <option value="3">3</option>
+                        <option value="4">4</option>
+                        <option value="5">5</option>
+                    </select>
+                </div>
+                <div class="form-group" style="display:flex; align-items:flex-end; padding-bottom:0.25rem;">
+                    <small style="color:#666; font-size:0.75rem; line-height:1.4;">
+                        Max 5 volunteers per occurrence
+                    </small>
+                </div>
+            </div>
+        </div>`;
+    }
+
+    function addMeetingSlot() {
+        const container = document.getElementById('meetingSlotsContainer');
+        container.insertAdjacentHTML('beforeend', buildSlotHTML(slotCount));
+        updateRemoveButtons();
+        slotCount++;
+    }
+
+    function removeSlot(index) {
+        const slot = document.getElementById('slot-' + index);
+        if (slot) slot.remove();
+        updateRemoveButtons();
+    }
+
+    function updateRemoveButtons() {
+        // Hide remove button when only one slot remains
+        const slots = document.querySelectorAll('.meeting-slot');
+        slots.forEach(slot => {
+            const btn = slot.querySelector('.btn-remove-slot');
+            if (btn) btn.style.display = slots.length <= 1 ? 'none' : 'inline-flex';
+        });
+    }
+
+    // Add the first slot automatically when the modal opens
     function openAddFacilityModal() {
         document.getElementById('modalTitle').textContent = 'Add New Facility';
         document.getElementById('facilityForm').reset();
+        // Clear and rebuild slots
+        document.getElementById('meetingSlotsContainer').innerHTML = '';
+        slotCount = 0;
+        addMeetingSlot();
         document.getElementById('facilityModal').classList.add('show');
     }
 
