@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find /c/Users/Sara/Projects/Chronosync/chronosync/database/migrations -name \"*.php\" -exec basename {} \\\\;)"
+    ]
+  }
+}
