@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Availability;
 use App\Models\Volunteer;
 use App\Models\AuditLog;
 use Illuminate\Http\Request;
@@ -9,75 +10,55 @@ use Illuminate\Support\Facades\DB;
 
 class AvailabilityController extends Controller
 {
-    /**
-     * Get volunteer availability grid (35 slots: 5 weeks × 7 days).
-     */
     public function show(Volunteer $volunteer)
     {
         $this->authorizeVolunteerOrCoordinator($volunteer);
 
-        $availability = json_decode($volunteer->availability, true) ?? array_fill(0, 35, false);
+        // Build a fast lookup keyed by "week-day-hour"
+        $slots = $volunteer->availability()
+            ->where('is_available', true)
+            ->get()
+            ->keyBy(fn($s) => "{$s->week_of_month}-{$s->day_of_week}-{$s->hour_start}");
 
-        // Structure as 5 weeks × 7 days
-        $grid = [];
-        $dayLabels = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-
-        for ($week = 0; $week < 5; $week++) {
-            $grid[$week] = [];
-            for ($day = 0; $day < 7; $day++) {
-                $index = ($week * 7) + $day;
-                $grid[$week][$day] = [
-                    'day_label' => $dayLabels[$day],
-                    'available' => $availability[$index] ?? false,
-                    'slot_index' => $index,
-                ];
-            }
-        }
-
-        return view('availability.show', compact('volunteer', 'grid'));
+        return view('volunteer.availability', compact('volunteer', 'slots'));
     }
 
-    /**
-     * Update volunteer availability pattern.
-     */
     public function update(Request $request, Volunteer $volunteer)
     {
         $this->authorizeVolunteerOrCoordinator($volunteer);
 
-        $validated = $request->validate([
-            'availability' => 'required|array|size:35',
-            'availability.*' => 'boolean',
-        ]);
+        $data = $request->input('availability', []);
 
-        return DB::transaction(function () use ($validated, $volunteer) {
-            $oldAvailability = json_decode($volunteer->availability, true) ?? array_fill(0, 35, false);
-            $newAvailability = array_values($validated['availability']);
+        return DB::transaction(function () use ($data, $volunteer, $request) {
+            // Wipe existing slots and rebuild from submitted data
+            $volunteer->availability()->delete();
 
-            // Check if there are changes
-            $hasChanges = false;
-            for ($i = 0; $i < 35; $i++) {
-                if (($oldAvailability[$i] ?? false) !== ($newAvailability[$i] ?? false)) {
-                    $hasChanges = true;
-                    break;
+            foreach ($data as $week => $days) {
+                foreach ($days as $day => $hours) {
+                    foreach ($hours as $hour => $value) {
+                        if ($value == '1') {
+                            Availability::create([
+                                'volunteer_id'  => $volunteer->volunteer_id,
+                                'week_of_month' => (int) $week,
+                                'day_of_week'   => (int) $day,
+                                'hour_start'    => (int) $hour,
+                                'is_available'  => true,
+                            ]);
+                        }
+                    }
                 }
             }
 
-            if ($hasChanges) {
-                $volunteer->availability = json_encode($newAvailability);
-                $volunteer->save();
+            AuditLog::create([
+                'actor_user_id'  => auth()->id(),
+                'action'         => 'update_volunteer',
+                'entity_type'    => 'availability',
+                'entity_id'      => $volunteer->volunteer_id,
+                'change_details' => ['slots_updated' => true],
+            ]);
 
-                AuditLog::create([
-                    'user_id' => auth()->id(),
-                    'action' => 'volunteer_availability_updated',
-                    'model_type' => Volunteer::class,
-                    'model_id' => $volunteer->id,
-                    'changes' => [
-                        'availability' => [
-                            'old' => $oldAvailability,
-                            'new' => $newAvailability,
-                        ],
-                    ],
-                ]);
+            if ($request->ajax() || $request->expectsJson()) {
+                return response()->json(['success' => true, 'message' => 'Availability saved.']);
             }
 
             return redirect()->route('availability.show', $volunteer)
@@ -85,82 +66,70 @@ class AvailabilityController extends Controller
         });
     }
 
-    /**
-     * Get optimized availability for matching engine.
-     */
     public function getForMatching(Volunteer $volunteer)
     {
-        // This endpoint is typically called by the matching service
-        // Return availability in a format optimized for the matching algorithm
+        $slots = $volunteer->availability()->where('is_available', true)->get();
+        $dayLabels = [1=>'Monday',2=>'Tuesday',3=>'Wednesday',4=>'Thursday',5=>'Friday',6=>'Saturday',7=>'Sunday'];
 
-        $availability = json_decode($volunteer->availability, true) ?? array_fill(0, 35, false);
-
-        // Create a more usable format with day/week info
-        $formatted = [];
-        $dayLabels = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-
-        for ($week = 0; $week < 5; $week++) {
-            for ($day = 0; $day < 7; $day++) {
-                $index = ($week * 7) + $day;
-                if ($availability[$index] ?? false) {
-                    $formatted[] = [
-                        'week' => $week + 1,
-                        'day' => $dayLabels[$day],
-                        'day_index' => $day,
-                        'slot_index' => $index,
-                    ];
-                }
-            }
-        }
+        $formatted = $slots->map(fn($s) => [
+            'week'      => $s->week_of_month,
+            'day'       => $dayLabels[$s->day_of_week] ?? 'Unknown',
+            'day_index' => $s->day_of_week,
+            'hour'      => $s->hour_start,
+        ]);
 
         return response()->json([
-            'volunteer_id' => $volunteer->id,
-            'is_available' => !empty($formatted),
-            'available_slots' => $formatted,
-            'total_available_slots' => count($formatted),
+            'volunteer_id'          => $volunteer->volunteer_id,
+            'is_available'          => $formatted->isNotEmpty(),
+            'available_slots'       => $formatted,
+            'total_available_slots' => $formatted->count(),
         ]);
     }
 
-    /**
-     * Bulk update availability for multiple volunteers (admin only).
-     */
     public function bulkUpdate(Request $request)
     {
         $this->authorizeAdmin();
 
         $validated = $request->validate([
-            'volunteer_ids' => 'required|array',
-            'volunteer_ids.*' => 'exists:volunteers,id',
-            'availability' => 'required|array|size:35',
-            'availability.*' => 'boolean',
+            'volunteer_ids'   => 'required|array',
+            'volunteer_ids.*' => 'exists:volunteers,volunteer_id',
+            'availability'    => 'required|array',
         ]);
 
         return DB::transaction(function () use ($validated) {
-            $newAvailability = json_encode(array_values($validated['availability']));
             $updatedCount = 0;
 
             foreach ($validated['volunteer_ids'] as $volunteerId) {
                 $volunteer = Volunteer::find($volunteerId);
+                if (!$volunteer) continue;
 
-                if ($volunteer->availability !== $newAvailability) {
-                    $oldAvailability = $volunteer->availability;
-                    $volunteer->availability = $newAvailability;
-                    $volunteer->save();
+                $volunteer->availability()->delete();
 
-                    AuditLog::create([
-                        'user_id' => auth()->id(),
-                        'action' => 'volunteer_availability_bulk_updated',
-                        'model_type' => Volunteer::class,
-                        'model_id' => $volunteer->id,
-                        'changes' => [
-                            'bulk_update' => true,
-                            'old_availability' => $oldAvailability,
-                            'new_availability' => $newAvailability,
-                        ],
-                    ]);
-
-                    $updatedCount++;
+                foreach ($validated['availability'] as $week => $days) {
+                    foreach ($days as $day => $hours) {
+                        foreach ($hours as $hour => $value) {
+                            if ($value == '1') {
+                                Availability::create([
+                                    'volunteer_id'  => $volunteer->volunteer_id,
+                                    'week_of_month' => (int) $week,
+                                    'day_of_week'   => (int) $day,
+                                    'hour_start'    => (int) $hour,
+                                    'is_available'  => true,
+                                ]);
+                            }
+                        }
+                    }
                 }
+
+                AuditLog::create([
+                    'actor_user_id'  => auth()->id(),
+                    'action'         => 'update_volunteer',
+                    'entity_type'    => 'availability',
+                    'entity_id'      => $volunteer->volunteer_id,
+                    'change_details' => ['bulk_update' => true],
+                ]);
+
+                $updatedCount++;
             }
 
             return redirect()->back()
@@ -168,19 +137,14 @@ class AvailabilityController extends Controller
         });
     }
 
-    /**
-     * Authorize volunteer viewing own or coordinator viewing any.
-     */
     private function authorizeVolunteerOrCoordinator(Volunteer $volunteer)
     {
         $user = auth()->user();
 
-        // Own profile
-        if ($user->id === $volunteer->user_id) {
+        if ($user->email === $volunteer->email) {
             return;
         }
 
-        // Coordinator or admin
         $roles = is_array($user->roles) ? $user->roles : json_decode($user->roles, true) ?? [];
 
         if (!in_array('coordinator', $roles) && !in_array('admin', $roles)) {
@@ -188,9 +152,6 @@ class AvailabilityController extends Controller
         }
     }
 
-    /**
-     * Authorize admin only.
-     */
     private function authorizeAdmin()
     {
         $user = auth()->user();

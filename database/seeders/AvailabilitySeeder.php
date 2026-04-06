@@ -8,104 +8,69 @@ use Illuminate\Database\Seeder;
 
 class AvailabilitySeeder extends Seeder
 {
-    /**
-     * Seed the volunteer availability.
-     */
+    // Day of week constants (Carbon: 0=Sunday, 1=Monday...6=Saturday)
+    const MONDAY    = 1;
+    const TUESDAY   = 2;
+    const WEDNESDAY = 3;
+    const THURSDAY  = 4;
+    const FRIDAY    = 5;
+
     public function run(): void
     {
-        $volunteers = Volunteer::all();
+        // Availability patterns per volunteer email
+        // Each slot: [day_of_week (int), hours (array of hour_start ints)]
+        $patterns = [
+            'john@example.com' => $this->allWeekdayHours(),
+            'emily@example.com' => $this->allWeekdayHours(),
+            'james@example.com' => $this->allWeekdayHours(),
+            'carlos@example.com' => $this->allWeekdayHours(),
 
-        // Define availability patterns for different volunteer profiles
-        $availabilityPatterns = [
-            // John Smith - available most times
-            [
-                'emails' => ['john@example.com'],
-                'slots' => $this->getAllSlots(),
+            'sarah@example.com' => [
+                [self::MONDAY,    [14, 15]],
+                [self::WEDNESDAY, [19, 20]],
+                [self::FRIDAY,    [17, 18]],
             ],
-            // Sarah Johnson - limited availability
-            [
-                'emails' => ['sarah@example.com'],
-                'slots' => [
-                    ['day' => 'Monday', 'start_time' => '14:00', 'end_time' => '16:00'],
-                    ['day' => 'Wednesday', 'start_time' => '19:00', 'end_time' => '21:00'],
-                    ['day' => 'Friday', 'start_time' => '17:00', 'end_time' => '19:00'],
-                ],
+            'marcus@example.com' => [
+                [self::TUESDAY,   [9, 10]],
+                [self::WEDNESDAY, [19, 20]],
+                [self::THURSDAY,  [18, 19]],
             ],
-            // Marcus Williams - evening availability mostly
-            [
-                'emails' => ['marcus@example.com'],
-                'slots' => [
-                    ['day' => 'Tuesday', 'start_time' => '09:00', 'end_time' => '11:00'],
-                    ['day' => 'Wednesday', 'start_time' => '19:00', 'end_time' => '21:00'],
-                    ['day' => 'Thursday', 'start_time' => '18:00', 'end_time' => '20:00'],
-                ],
+            'robert@example.com' => [
+                [self::MONDAY,    [14, 15]],
+                [self::TUESDAY,   [9, 10]],
+                [self::FRIDAY,    [14, 15]],
             ],
-            // Emily Chen - flexible
-            [
-                'emails' => ['emily@example.com'],
-                'slots' => $this->getAllSlots(),
+            'lisa@example.com' => [
+                [self::TUESDAY,  [9, 10]],
+                [self::THURSDAY, [18, 19]],
+                [self::FRIDAY,   [17, 18]],
             ],
-            // Robert Davis - morning preference
-            [
-                'emails' => ['robert@example.com'],
-                'slots' => [
-                    ['day' => 'Monday', 'start_time' => '14:00', 'end_time' => '16:00'],
-                    ['day' => 'Tuesday', 'start_time' => '09:00', 'end_time' => '11:00'],
-                    ['day' => 'Friday', 'start_time' => '14:00', 'end_time' => '16:00'],
-                ],
+            'amanda@example.com' => [
+                [self::MONDAY,    [14, 15]],
+                [self::WEDNESDAY, [19, 20]],
+                [self::THURSDAY,  [18, 19]],
             ],
-            // Lisa Martinez - weekday only
-            [
-                'emails' => ['lisa@example.com'],
-                'slots' => [
-                    ['day' => 'Tuesday', 'start_time' => '09:00', 'end_time' => '11:00'],
-                    ['day' => 'Thursday', 'start_time' => '18:00', 'end_time' => '20:00'],
-                    ['day' => 'Friday', 'start_time' => '17:00', 'end_time' => '19:00'],
-                ],
-            ],
-            // James Wilson - very flexible
-            [
-                'emails' => ['james@example.com'],
-                'slots' => $this->getAllSlots(),
-            ],
-            // Amanda Thompson - evening focused
-            [
-                'emails' => ['amanda@example.com'],
-                'slots' => [
-                    ['day' => 'Monday', 'start_time' => '14:00', 'end_time' => '16:00'],
-                    ['day' => 'Wednesday', 'start_time' => '19:00', 'end_time' => '21:00'],
-                    ['day' => 'Thursday', 'start_time' => '18:00', 'end_time' => '20:00'],
-                ],
-            ],
-            // Carlos Garcia - all slots
-            [
-                'emails' => ['carlos@example.com'],
-                'slots' => $this->getAllSlots(),
-            ],
-            // Patricia Brown - specific times
-            [
-                'emails' => ['patricia@example.com'],
-                'slots' => [
-                    ['day' => 'Tuesday', 'start_time' => '09:00', 'end_time' => '11:00'],
-                    ['day' => 'Wednesday', 'start_time' => '19:00', 'end_time' => '21:00'],
-                    ['day' => 'Friday', 'start_time' => '17:00', 'end_time' => '19:00'],
-                ],
+            'patricia@example.com' => [
+                [self::TUESDAY,   [9, 10]],
+                [self::WEDNESDAY, [19, 20]],
+                [self::FRIDAY,    [17, 18]],
             ],
         ];
 
-        foreach ($availabilityPatterns as $pattern) {
-            foreach ($pattern['emails'] as $email) {
-                $volunteer = Volunteer::whereHas('user', function ($query) use ($email) {
-                    $query->where('email', $email);
-                })->first();
+        foreach ($patterns as $email => $slots) {
+            $volunteer = Volunteer::where('email', $email)->first();
+            if (!$volunteer) continue;
 
-                if ($volunteer) {
-                    foreach ($pattern['slots'] as $slot) {
+            // Insert for all 4 weeks of the month
+            foreach (range(1, 4) as $week) {
+                foreach ($slots as [$dayOfWeek, $hours]) {
+                    foreach ($hours as $hourStart) {
                         Availability::create([
-                            'volunteer_id' => $volunteer->id,
-                            'day_of_week' => $slot['day'],
-                            'start_time' => $slot['start_time'],
-                            'end_time' => $slot['end_time'],
+                            'volunteer_id' => $volunteer->volunteer_id,
+                            'week_of_month' => $week,
+                            'day_of_week'   => $dayOfWeek,
+                            'hour_start'    => $hourStart,
+                            'is_available'  => true,
                         ]);
                     }
                 }
@@ -113,19 +78,14 @@ class AvailabilitySeeder extends Seeder
         }
     }
 
-    private function getAllSlots(): array
+    // All weekday business + evening hours (9-20) for each weekday
+    private function allWeekdayHours(): array
     {
-        return [
-            ['day' => 'Monday', 'start_time' => '09:00', 'end_time' => '17:00'],
-            ['day' => 'Monday', 'start_time' => '17:00', 'end_time' => '21:00'],
-            ['day' => 'Tuesday', 'start_time' => '09:00', 'end_time' => '17:00'],
-            ['day' => 'Tuesday', 'start_time' => '17:00', 'end_time' => '21:00'],
-            ['day' => 'Wednesday', 'start_time' => '09:00', 'end_time' => '17:00'],
-            ['day' => 'Wednesday', 'start_time' => '17:00', 'end_time' => '21:00'],
-            ['day' => 'Thursday', 'start_time' => '09:00', 'end_time' => '17:00'],
-            ['day' => 'Thursday', 'start_time' => '17:00', 'end_time' => '21:00'],
-            ['day' => 'Friday', 'start_time' => '09:00', 'end_time' => '17:00'],
-            ['day' => 'Friday', 'start_time' => '17:00', 'end_time' => '21:00'],
-        ];
+        $slots = [];
+        $hours = range(9, 20);
+        foreach ([self::MONDAY, self::TUESDAY, self::WEDNESDAY, self::THURSDAY, self::FRIDAY] as $day) {
+            $slots[] = [$day, $hours];
+        }
+        return $slots;
     }
 }

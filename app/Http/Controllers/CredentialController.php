@@ -44,7 +44,7 @@ class CredentialController extends Controller
         $credentials = $query->orderBy('expiration_date')->paginate(15);
         $expiringCount = $this->getExpiringCredentialsCount();
 
-        return view('credentials.index', compact('credentials', 'expiringCount'));
+        return view('coordinator.credentials', compact('credentials', 'expiringCount'));
     }
 
     /**
@@ -219,7 +219,7 @@ class CredentialController extends Controller
             ->orderBy('expiration_date')
             ->get();
 
-        return view('credentials.expiring', compact('credentials'));
+        return view('placeholder.coming-soon', compact('credentials'));
     }
 
     /**

@@ -48,7 +48,7 @@ class VolunteerController extends Controller
 
         $volunteers = $query->paginate(15);
 
-        return view('volunteers.index', compact('volunteers'));
+        return view('coordinator.volunteers', compact('volunteers'));
     }
 
     /**
@@ -56,11 +56,11 @@ class VolunteerController extends Controller
      */
     public function create()
     {
-        $facilities = Facility::where('is_active', true)
-            ->orderBy('name')
+        $facilities = Facility::where('status', 'active')
+            ->orderBy('facility_name')
             ->get();
 
-        return view('volunteers.create', compact('facilities'));
+        return view('placeholder.coming-soon', compact('facilities'));
     }
 
     /**
@@ -114,11 +114,11 @@ class VolunteerController extends Controller
 
             // Audit log
             AuditLog::create([
-                'user_id' => auth()->id(),
-                'action' => 'volunteer_created',
-                'model_type' => Volunteer::class,
-                'model_id' => $volunteer->id,
-                'changes' => ['created' => $volunteer->toArray()],
+                'actor_user_id'  => auth()->id(),
+                'action'         => 'create_volunteer',
+                'entity_type'    => 'volunteers',
+                'entity_id'      => $volunteer->volunteer_id,
+                'change_details' => ['created' => true],
             ]);
 
             return redirect()->route('volunteers.show', $volunteer)
@@ -133,7 +133,7 @@ class VolunteerController extends Controller
     {
         $this->authorizeView($volunteer);
 
-        return view('volunteers.show', compact('volunteer'));
+        return view('volunteer.profile', compact('volunteer'));
     }
 
     /**
@@ -143,11 +143,11 @@ class VolunteerController extends Controller
     {
         $this->authorizeEdit($volunteer);
 
-        $facilities = Facility::where('is_active', true)
-            ->orderBy('name')
+        $facilities = Facility::where('status', 'active')
+            ->orderBy('facility_name')
             ->get();
 
-        return view('volunteers.edit', compact('volunteer', 'facilities'));
+        return view('placeholder.coming-soon', compact('volunteer', 'facilities'));
     }
 
     /**
@@ -257,11 +257,11 @@ class VolunteerController extends Controller
             // Audit log
             if (!empty($changes)) {
                 AuditLog::create([
-                    'user_id' => auth()->id(),
-                    'action' => 'volunteer_updated',
-                    'model_type' => Volunteer::class,
-                    'model_id' => $volunteer->id,
-                    'changes' => $changes,
+                    'actor_user_id'  => auth()->id(),
+                    'action'         => 'update_volunteer',
+                    'entity_type'    => 'volunteers',
+                    'entity_id'      => $volunteer->volunteer_id,
+                    'change_details' => $changes,
                 ]);
             }
 
@@ -290,11 +290,11 @@ class VolunteerController extends Controller
             $volunteer->delete();
 
             AuditLog::create([
-                'user_id' => auth()->id(),
-                'action' => 'volunteer_deleted',
-                'model_type' => Volunteer::class,
-                'model_id' => $volunteer->id,
-                'changes' => ['deleted' => true],
+                'actor_user_id'  => auth()->id(),
+                'action'         => 'delete_volunteer',
+                'entity_type'    => 'volunteers',
+                'entity_id'      => $volunteer->volunteer_id,
+                'change_details' => ['deleted' => true],
             ]);
 
             return redirect()->route('volunteers.index')
@@ -320,8 +320,8 @@ class VolunteerController extends Controller
      */
     private function authorizeView(Volunteer $volunteer)
     {
-        // Own profile or coordinator/admin
-        if (auth()->id() === $volunteer->user_id) {
+        // Match by email — volunteers have no user_id FK
+        if (auth()->user()->email === $volunteer->email) {
             return;
         }
 
@@ -333,8 +333,8 @@ class VolunteerController extends Controller
      */
     private function authorizeEdit(Volunteer $volunteer)
     {
-        // Own profile or coordinator/admin
-        if (auth()->id() === $volunteer->user_id) {
+        // Match by email — volunteers have no user_id FK
+        if (auth()->user()->email === $volunteer->email) {
             return;
         }
 

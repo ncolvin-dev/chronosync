@@ -56,7 +56,7 @@ class ReportController extends Controller
                 ];
             });
 
-        return view('reports.coverage-summary', compact(
+        return view('reports.coverage', compact(
             'totalMeetings',
             'assignedMeetings',
             'unassignedMeetings',
@@ -95,7 +95,7 @@ class ReportController extends Controller
                 ];
             });
 
-        return view('reports.facility-schedule', compact('facility', 'meetings', 'dateFrom', 'dateTo'));
+        return view('reports.facility-detail', compact('facility', 'meetings', 'dateFrom', 'dateTo'));
     }
 
     /**
@@ -131,7 +131,7 @@ class ReportController extends Controller
             ->get()
             ->count();
 
-        return view('reports.credential-expiration', compact(
+        return view('placeholder.coming-soon', compact(
             'expiringCredentials',
             'expiredCredentials',
             'daysUntilExpiry'
@@ -166,7 +166,7 @@ class ReportController extends Controller
             ->values()
             ->all();
 
-        return view('reports.unfilled-meetings', compact('meetings'));
+        return view('placeholder.coming-soon', compact('meetings'));
     }
 
     /**

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" id="htmlRoot">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -151,6 +151,162 @@
             z-index: 1060;
             min-width: 300px;
         }
+
+        /* ── Dark Mode ── */
+        html.dark {
+            color-scheme: dark;
+        }
+
+        html.dark body {
+            background-color: #0f1117;
+            color: #e2e8f0;
+        }
+
+        html.dark .navbar {
+            background-color: #0a0f1a !important;
+            border-bottom: 1px solid #1e2a3a;
+        }
+
+        html.dark .main-content {
+            background-color: #0f1117;
+        }
+
+        html.dark .card,
+        html.dark .filter-section,
+        html.dark .meetings-container,
+        html.dark .section-card,
+        html.dark .stat-card,
+        html.dark .modal-content {
+            background-color: #1a2235 !important;
+            border-color: #2a3a50 !important;
+            color: #e2e8f0;
+        }
+
+        html.dark .card-header {
+            background-color: #1e2a3a !important;
+            border-color: #2a3a50 !important;
+            color: #e2e8f0;
+        }
+
+        html.dark .form-control,
+        html.dark .form-select {
+            background-color: #0f1117;
+            border-color: #2a3a50;
+            color: #e2e8f0;
+        }
+
+        html.dark .form-control:focus,
+        html.dark .form-select:focus {
+            background-color: #0f1117;
+            color: #e2e8f0;
+            border-color: var(--sky-blue);
+        }
+
+        html.dark .form-label,
+        html.dark .filter-title,
+        html.dark .matching-title,
+        html.dark .section-title,
+        html.dark .stat-card-value,
+        html.dark h1, html.dark h2, html.dark h3,
+        html.dark h4, html.dark h5, html.dark h6 {
+            color: #e2e8f0 !important;
+        }
+
+        html.dark .meetings-table th {
+            background-color: #1e2a3a !important;
+            color: #93c5fd !important;
+            border-color: #2a3a50 !important;
+        }
+
+        html.dark .meetings-table td,
+        html.dark .meeting-row {
+            border-color: #2a3a50 !important;
+            color: #e2e8f0;
+        }
+
+        html.dark .meetings-table tr:hover,
+        html.dark .meeting-row:hover {
+            background-color: #1e2a3a !important;
+        }
+
+        html.dark .volunteer-chip {
+            background-color: #1e2a3a !important;
+            color: #e2e8f0 !important;
+        }
+
+        html.dark .meeting-info-label,
+        html.dark .stat-card-label,
+        html.dark p, html.dark small, html.dark span {
+            color: #94a3b8;
+        }
+
+        html.dark .meeting-info-value,
+        html.dark .meeting-info-value *,
+        html.dark .volunteers-title {
+            color: #e2e8f0 !important;
+        }
+
+        html.dark .alert-success {
+            background-color: #14532d;
+            border-color: #166534;
+            color: #bbf7d0;
+        }
+
+        html.dark .alert-danger {
+            background-color: #450a0a;
+            border-color: #7f1d1d;
+            color: #fecaca;
+        }
+
+        html.dark .alert-warning {
+            background-color: #431407;
+            border-color: #7c2d12;
+            color: #fed7aa;
+        }
+
+        html.dark .dropdown-menu {
+            background-color: #1a2235;
+            border-color: #2a3a50;
+        }
+
+        html.dark .dropdown-item {
+            color: #e2e8f0;
+        }
+
+        html.dark .dropdown-item:hover {
+            background-color: #1e2a3a;
+            color: #fff;
+        }
+
+        html.dark .modal-header {
+            border-color: #2a3a50;
+        }
+
+        html.dark .modal-footer {
+            border-color: #2a3a50;
+            background-color: #1a2235;
+        }
+
+        html.dark .table {
+            color: #e2e8f0;
+        }
+
+        html.dark .table td, html.dark .table th {
+            border-color: #2a3a50;
+        }
+
+        html.dark hr, html.dark .dropdown-divider {
+            border-color: #2a3a50;
+        }
+
+        html.dark .text-muted {
+            color: #64748b !important;
+        }
+
+        html.dark input::placeholder,
+        html.dark textarea::placeholder {
+            color: #475569;
+        }
     </style>
 
     @yield('extra-styles')
@@ -168,7 +324,7 @@
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav ms-auto">
                     @auth
-                        @if(auth()->user()->role === 'volunteer')
+                        @if(auth()->user()->hasRole('volunteer') && !auth()->user()->hasAnyRole(['coordinator', 'admin']))
                             <li class="nav-item">
                                 <a class="nav-link {{ request()->routeIs('volunteer.dashboard') ? 'active' : '' }}" href="{{ route('volunteer.dashboard') }}">
                                     <i class="fas fa-home"></i> Dashboard
@@ -189,7 +345,7 @@
                                     <i class="fas fa-user"></i> Profile
                                 </a>
                             </li>
-                        @elseif(auth()->user()->role === 'coordinator')
+                        @elseif(auth()->user()->hasAnyRole(['coordinator', 'admin']))
                             <li class="nav-item">
                                 <a class="nav-link {{ request()->routeIs('coordinator.dashboard') ? 'active' : '' }}" href="{{ route('coordinator.dashboard') }}">
                                     <i class="fas fa-chart-line"></i> Dashboard
@@ -278,6 +434,24 @@
         </div>
     @endif
 
+    @if(session('error'))
+        <div class="flash-messages">
+            <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                <i class="fas fa-times-circle"></i> {{ session('error') }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        </div>
+    @endif
+
+    @if(session('error'))
+        <div class="flash-messages">
+            <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                <i class="fas fa-times-circle"></i> {{ session('error') }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        </div>
+    @endif
+
     @if(session('warning'))
         <div class="flash-messages">
             <div class="alert alert-warning alert-dismissible fade show" role="alert">
@@ -312,6 +486,15 @@
             </div>
         </div>
     </div>
+
+    <!-- Dark mode: apply before paint to avoid flash -->
+    <script>
+        (function () {
+            if (localStorage.getItem('darkMode') === 'true') {
+                document.getElementById('htmlRoot').classList.add('dark');
+            }
+        })();
+    </script>
 
     <!-- Bootstrap JS Bundle -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
@@ -387,5 +570,20 @@
     </script>
 
     @yield('extra-scripts')
+
+    <!-- Auto-dismiss success/warning flash messages -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            document.querySelectorAll('.flash-messages .alert-success, .flash-messages .alert-warning').forEach(function (alert) {
+                setTimeout(function () {
+                    alert.style.transition = 'opacity 0.6s ease';
+                    alert.style.opacity = '0';
+                    setTimeout(function () {
+                        bootstrap.Alert.getOrCreateInstance(alert).close();
+                    }, 600);
+                }, 3000);
+            });
+        });
+    </script>
 </body>
 </html>

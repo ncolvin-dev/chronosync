@@ -34,7 +34,7 @@ class SmsController extends Controller
                 'api_key' => '****' . substr(config('services.sms.api_key'), -4),
             ];
 
-            return view('sms.configure', compact('settings'));
+            return view('coordinator.sms-config', compact('settings'));
         }
 
         $validated = $request->validate([
@@ -199,7 +199,7 @@ class SmsController extends Controller
 
         $logs = $query->orderBy('created_at', 'desc')->paginate(25);
 
-        return view('sms.log', compact('logs'));
+        return view('placeholder.coming-soon', compact('logs'));
     }
 
     /**

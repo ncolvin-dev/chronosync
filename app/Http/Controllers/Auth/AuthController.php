@@ -32,7 +32,7 @@ class AuthController extends Controller
 
         $user = User::where('email', $validated['email'])->first();
 
-        if (!$user || !Hash::check($validated['password'], $user->password)) {
+        if (!$user || !Hash::check($validated['password'], $user->password_hash)) {
             return back()
                 ->withInput($request->only('email'))
                 ->withErrors(['email' => 'The provided credentials are invalid.']);
@@ -51,7 +51,7 @@ class AuthController extends Controller
         session(['last_activity' => time()]);
 
         return redirect()->route('dashboard')
-            ->with('success', 'Welcome back, ' . $user->name . '!');
+            ->with('success', 'Welcome back!');
     }
 
     /**

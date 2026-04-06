@@ -28,20 +28,20 @@ class AuditLog extends Model
 
     public $timestamps = false;
 
-    protected $primaryKey = 'audit_id';
+    protected $primaryKey = 'audit_log_id';
 
     protected $fillable = [
         'actor_user_id',
-        'action_type',
-        'table_name',
-        'record_id',
+        'action',
+        'entity_type',
+        'entity_id',
         'change_details',
-        'timestamp',
+        'reason',
+        'ip_address',
     ];
 
     protected $casts = [
         'change_details' => 'array',
-        'timestamp' => 'datetime',
     ];
 
     /**
@@ -70,7 +70,7 @@ class AuditLog extends Model
             'delete_facility' => 'Deleted Facility',
         ];
 
-        return $labels[$this->action_type] ?? $this->action_type;
+        return $labels[$this->action] ?? $this->action;
     }
 
     /**
@@ -92,47 +92,47 @@ class AuditLog extends Model
      * @param string $actionType
      * @return Builder
      */
-    public function scopeByAction(Builder $query, string $actionType): Builder
+    public function scopeByAction(Builder $query, string $action): Builder
     {
-        return $query->where('action_type', $actionType);
+        return $query->where('action', $action);
     }
 
     /**
-     * Scope: Get logs for a specific table.
+     * Scope: Get logs for a specific entity type.
      *
      * @param Builder $query
-     * @param string $tableName
+     * @param string $entityType
      * @return Builder
      */
-    public function scopeForTable(Builder $query, string $tableName): Builder
+    public function scopeForEntity(Builder $query, string $entityType): Builder
     {
-        return $query->where('table_name', $tableName);
+        return $query->where('entity_type', $entityType);
     }
 
     /**
-     * Scope: Get logs for a specific record.
+     * Scope: Get logs for a specific entity.
      *
      * @param Builder $query
-     * @param string $recordId
+     * @param string $entityId
      * @return Builder
      */
-    public function scopeForRecord(Builder $query, string $recordId): Builder
+    public function scopeForEntityId(Builder $query, string $entityId): Builder
     {
-        return $query->where('record_id', $recordId);
+        return $query->where('entity_id', $entityId);
     }
 
     /**
-     * Scope: Get logs for a table and record combination.
+     * Scope: Get logs for a specific entity type and ID combination.
      *
      * @param Builder $query
-     * @param string $tableName
-     * @param string $recordId
+     * @param string $entityType
+     * @param string $entityId
      * @return Builder
      */
-    public function scopeForTableRecord(Builder $query, string $tableName, string $recordId): Builder
+    public function scopeForEntityRecord(Builder $query, string $entityType, string $entityId): Builder
     {
-        return $query->where('table_name', $tableName)
-            ->where('record_id', $recordId);
+        return $query->where('entity_type', $entityType)
+            ->where('entity_id', $entityId);
     }
 
     /**
@@ -143,9 +143,9 @@ class AuditLog extends Model
      * @param \Carbon\Carbon $endDate
      * @return Builder
      */
-    public function scopeTimestampBetween(Builder $query, $startDate, $endDate): Builder
+    public function scopeCreatedBetween(Builder $query, $startDate, $endDate): Builder
     {
-        return $query->whereBetween('timestamp', [$startDate, $endDate]);
+        return $query->whereBetween('created_at', [$startDate, $endDate]);
     }
 
     /**
@@ -157,18 +157,18 @@ class AuditLog extends Model
      */
     public function scopeRecent(Builder $query, int $days = 7): Builder
     {
-        return $query->where('timestamp', '>=', now()->subDays($days));
+        return $query->where('created_at', '>=', now()->subDays($days));
     }
 
     /**
-     * Scope: Get logs ordered by timestamp descending (most recent first).
+     * Scope: Get logs ordered by created_at descending (most recent first).
      *
      * @param Builder $query
      * @return Builder
      */
     public function scopeLatest(Builder $query): Builder
     {
-        return $query->orderBy('timestamp', 'desc');
+        return $query->orderBy('created_at', 'desc');
     }
 
     /**

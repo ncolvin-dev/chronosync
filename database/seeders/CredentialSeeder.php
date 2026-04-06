@@ -2,173 +2,149 @@
 
 namespace Database\Seeders;
 
-use App\Models\Credential;
 use App\Models\CredentialType;
 use App\Models\Facility;
 use App\Models\Volunteer;
+use App\Models\VolunteerCredential;
 use Illuminate\Database\Seeder;
 
 class CredentialSeeder extends Seeder
 {
-    /**
-     * Seed the credential types and volunteer credentials.
-     */
     public function run(): void
     {
-        // Create credential types
+        // Create credential types (matching credential_types table schema)
         $backgroundCheck = CredentialType::create([
-            'name' => 'background_check',
-            'display_name' => 'Background Check',
-            'validity_years' => 3,
+            'name'            => 'background_check',
+            'description'     => 'Criminal background check required by facility',
+            'expiration_days' => 1095, // 3 years
         ]);
 
         $tbTest = CredentialType::create([
-            'name' => 'TB_test',
-            'display_name' => 'TB Test',
-            'validity_years' => 1,
+            'name'            => 'tb_test',
+            'description'     => 'Tuberculosis test required by facility',
+            'expiration_days' => 365, // 1 year
         ]);
 
         $referenceCheck = CredentialType::create([
-            'name' => 'reference_check',
-            'display_name' => 'Reference Check',
-            'validity_years' => 2,
+            'name'            => 'reference_check',
+            'description'     => 'Character reference check required by facility',
+            'expiration_days' => 730, // 2 years
         ]);
 
-        $orientation = CredentialType::create([
-            'name' => 'orientation',
-            'display_name' => 'Orientation',
-            'validity_years' => null, // Permanent
+        CredentialType::create([
+            'name'            => 'orientation',
+            'description'     => 'Facility orientation training',
+            'expiration_days' => null, // Permanent
         ]);
 
-        // Get facilities for credential assignment
-        $metroHospital = Facility::where('name', 'Metro Hospital')->first();
-        $countyJail = Facility::where('name', 'County Jail')->first();
-        $youthDetention = Facility::where('name', 'Youth Detention Center')->first();
+        // Look up facilities by facility_name
+        $metroHospital  = Facility::where('facility_name', 'Metro Hospital')->first();
+        $countyJail     = Facility::where('facility_name', 'County Jail')->first();
+        $youthDetention = Facility::where('facility_name', 'Youth Detention Center')->first();
 
-        // Sarah Johnson - has approved credentials at Metro Hospital
-        $sarahVolunteer = Volunteer::whereHas('user', function ($query) {
-            $query->where('email', 'sarah@example.com');
-        })->first();
-
-        if ($sarahVolunteer && $metroHospital) {
-            Credential::create([
-                'volunteer_id' => $sarahVolunteer->id,
-                'facility_id' => $metroHospital->id,
-                'credential_type_id' => $backgroundCheck->id,
-                'status' => 'approved',
-                'issued_at' => now()->subYears(2),
-                'expires_at' => now()->addYears(1),
+        // Sarah Johnson - approved credentials at Metro Hospital
+        $sarah = Volunteer::where('email', 'sarah@example.com')->first();
+        if ($sarah && $metroHospital) {
+            VolunteerCredential::create([
+                'volunteer_id'       => $sarah->volunteer_id,
+                'facility_id'        => $metroHospital->facility_id,
+                'credential_type_id' => $backgroundCheck->credential_type_id,
+                'status'             => 'approved',
+                'approval_date'      => now()->subYears(2)->toDateString(),
+                'expiration_date'    => now()->addYear()->toDateString(),
             ]);
-
-            Credential::create([
-                'volunteer_id' => $sarahVolunteer->id,
-                'facility_id' => $metroHospital->id,
-                'credential_type_id' => $tbTest->id,
-                'status' => 'approved',
-                'issued_at' => now()->subMonths(6),
-                'expires_at' => now()->addMonths(6),
+            VolunteerCredential::create([
+                'volunteer_id'       => $sarah->volunteer_id,
+                'facility_id'        => $metroHospital->facility_id,
+                'credential_type_id' => $tbTest->credential_type_id,
+                'status'             => 'approved',
+                'approval_date'      => now()->subMonths(6)->toDateString(),
+                'expiration_date'    => now()->addMonths(6)->toDateString(),
             ]);
         }
 
-        // Robert Davis - has pending credentials
-        $robertVolunteer = Volunteer::whereHas('user', function ($query) {
-            $query->where('email', 'robert@example.com');
-        })->first();
-
-        if ($robertVolunteer && $metroHospital) {
-            Credential::create([
-                'volunteer_id' => $robertVolunteer->id,
-                'facility_id' => $metroHospital->id,
-                'credential_type_id' => $backgroundCheck->id,
-                'status' => 'pending',
-                'issued_at' => now()->subDays(7),
-                'expires_at' => null,
+        // Robert Davis - pending credential at Metro Hospital
+        $robert = Volunteer::where('email', 'robert@example.com')->first();
+        if ($robert && $metroHospital) {
+            VolunteerCredential::create([
+                'volunteer_id'       => $robert->volunteer_id,
+                'facility_id'        => $metroHospital->facility_id,
+                'credential_type_id' => $backgroundCheck->credential_type_id,
+                'status'             => 'pending',
+                'approval_date'      => null,
+                'expiration_date'    => null,
             ]);
         }
 
-        // Carlos Garcia - has all credentials approved
-        $carlosVolunteer = Volunteer::whereHas('user', function ($query) {
-            $query->where('email', 'carlos@example.com');
-        })->first();
-
-        if ($carlosVolunteer) {
-            // Approve for Metro Hospital
+        // Carlos Garcia - approved at multiple facilities
+        $carlos = Volunteer::where('email', 'carlos@example.com')->first();
+        if ($carlos) {
             if ($metroHospital) {
-                Credential::create([
-                    'volunteer_id' => $carlosVolunteer->id,
-                    'facility_id' => $metroHospital->id,
-                    'credential_type_id' => $backgroundCheck->id,
-                    'status' => 'approved',
-                    'issued_at' => now()->subYears(2),
-                    'expires_at' => now()->addYears(1),
+                VolunteerCredential::create([
+                    'volunteer_id'       => $carlos->volunteer_id,
+                    'facility_id'        => $metroHospital->facility_id,
+                    'credential_type_id' => $backgroundCheck->credential_type_id,
+                    'status'             => 'approved',
+                    'approval_date'      => now()->subYears(2)->toDateString(),
+                    'expiration_date'    => now()->addYear()->toDateString(),
                 ]);
-
-                Credential::create([
-                    'volunteer_id' => $carlosVolunteer->id,
-                    'facility_id' => $metroHospital->id,
-                    'credential_type_id' => $tbTest->id,
-                    'status' => 'approved',
-                    'issued_at' => now()->subMonths(6),
-                    'expires_at' => now()->addMonths(6),
+                VolunteerCredential::create([
+                    'volunteer_id'       => $carlos->volunteer_id,
+                    'facility_id'        => $metroHospital->facility_id,
+                    'credential_type_id' => $tbTest->credential_type_id,
+                    'status'             => 'approved',
+                    'approval_date'      => now()->subMonths(6)->toDateString(),
+                    'expiration_date'    => now()->addMonths(6)->toDateString(),
                 ]);
             }
-
-            // Approve for County Jail
             if ($countyJail) {
-                Credential::create([
-                    'volunteer_id' => $carlosVolunteer->id,
-                    'facility_id' => $countyJail->id,
-                    'credential_type_id' => $backgroundCheck->id,
-                    'status' => 'approved',
-                    'issued_at' => now()->subYears(2),
-                    'expires_at' => now()->addYears(1),
+                VolunteerCredential::create([
+                    'volunteer_id'       => $carlos->volunteer_id,
+                    'facility_id'        => $countyJail->facility_id,
+                    'credential_type_id' => $backgroundCheck->credential_type_id,
+                    'status'             => 'approved',
+                    'approval_date'      => now()->subYears(2)->toDateString(),
+                    'expiration_date'    => now()->addYear()->toDateString(),
                 ]);
             }
-
-            // Approve for Youth Detention
             if ($youthDetention) {
-                Credential::create([
-                    'volunteer_id' => $carlosVolunteer->id,
-                    'facility_id' => $youthDetention->id,
-                    'credential_type_id' => $backgroundCheck->id,
-                    'status' => 'approved',
-                    'issued_at' => now()->subYears(2),
-                    'expires_at' => now()->addYears(1),
+                VolunteerCredential::create([
+                    'volunteer_id'       => $carlos->volunteer_id,
+                    'facility_id'        => $youthDetention->facility_id,
+                    'credential_type_id' => $backgroundCheck->credential_type_id,
+                    'status'             => 'approved',
+                    'approval_date'      => now()->subYears(2)->toDateString(),
+                    'expiration_date'    => now()->addYear()->toDateString(),
                 ]);
-
-                Credential::create([
-                    'volunteer_id' => $carlosVolunteer->id,
-                    'facility_id' => $youthDetention->id,
-                    'credential_type_id' => $tbTest->id,
-                    'status' => 'approved',
-                    'issued_at' => now()->subMonths(6),
-                    'expires_at' => now()->addMonths(6),
+                VolunteerCredential::create([
+                    'volunteer_id'       => $carlos->volunteer_id,
+                    'facility_id'        => $youthDetention->facility_id,
+                    'credential_type_id' => $tbTest->credential_type_id,
+                    'status'             => 'approved',
+                    'approval_date'      => now()->subMonths(6)->toDateString(),
+                    'expiration_date'    => now()->addMonths(6)->toDateString(),
                 ]);
-
-                Credential::create([
-                    'volunteer_id' => $carlosVolunteer->id,
-                    'facility_id' => $youthDetention->id,
-                    'credential_type_id' => $referenceCheck->id,
-                    'status' => 'approved',
-                    'issued_at' => now()->subMonths(12),
-                    'expires_at' => now()->addMonths(12),
+                VolunteerCredential::create([
+                    'volunteer_id'       => $carlos->volunteer_id,
+                    'facility_id'        => $youthDetention->facility_id,
+                    'credential_type_id' => $referenceCheck->credential_type_id,
+                    'status'             => 'approved',
+                    'approval_date'      => now()->subMonths(12)->toDateString(),
+                    'expiration_date'    => now()->addMonths(12)->toDateString(),
                 ]);
             }
         }
 
         // Patricia Brown - expired credential at County Jail
-        $patriciaVolunteer = Volunteer::whereHas('user', function ($query) {
-            $query->where('email', 'patricia@example.com');
-        })->first();
-
-        if ($patriciaVolunteer && $countyJail) {
-            Credential::create([
-                'volunteer_id' => $patriciaVolunteer->id,
-                'facility_id' => $countyJail->id,
-                'credential_type_id' => $backgroundCheck->id,
-                'status' => 'approved',
-                'issued_at' => now()->subYears(3)->subMonths(3),
-                'expires_at' => now()->subDays(90), // Expired on 2025-12-31
+        $patricia = Volunteer::where('email', 'patricia@example.com')->first();
+        if ($patricia && $countyJail) {
+            VolunteerCredential::create([
+                'volunteer_id'       => $patricia->volunteer_id,
+                'facility_id'        => $countyJail->facility_id,
+                'credential_type_id' => $backgroundCheck->credential_type_id,
+                'status'             => 'approved',
+                'approval_date'      => now()->subYears(3)->subMonths(3)->toDateString(),
+                'expiration_date'    => now()->subDays(90)->toDateString(), // Expired
             ]);
         }
     }

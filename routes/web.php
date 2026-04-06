@@ -49,8 +49,14 @@ Route::post('/sms/webhook/response', [SmsController::class, 'handleResponse'])->
 Route::middleware(['auth', 'session_timeout'])->group(function () {
     // Dashboard
     Route::get('/', function () {
-        return view('dashboard');
+        $user = auth()->user();
+        $roles = is_array($user->roles) ? $user->roles : json_decode($user->roles, true) ?? [];
+        if (in_array('admin', $roles) || in_array('coordinator', $roles)) {
+            return view('coordinator.dashboard');
+        }
+        return view('volunteer.dashboard');
     })->name('dashboard');
+    Route::redirect('/home', '/')->name('home');
 
     // Logout
     Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
@@ -149,29 +155,29 @@ Route::middleware(['auth', 'session_timeout'])->group(function () {
         Route::get('/meetings/{meeting}', [MeetingController::class, 'show'])
             ->name('meetings.show');
 
-        // Automatic matching
+        // Deactivate / reactivate / delete recurring meeting slots
+        Route::post('/meetings/{meeting}/deactivate', [MeetingController::class, 'deactivate'])
+            ->name('meetings.deactivate');
+        Route::post('/meetings/{meeting}/activate', [MeetingController::class, 'activate'])
+            ->name('meetings.activate');
+        Route::delete('/meetings/{meeting}', [MeetingController::class, 'destroy'])
+            ->name('meetings.destroy');
+
+        // Assign a volunteer to a specific occurrence
         Route::post('/meetings/{meeting}/assign', [MeetingController::class, 'assign'])
             ->name('meetings.assign');
-
-        // Manual assignment with override
-        Route::post('/meetings/{meeting}/manual-assign', [MeetingController::class, 'manualAssign'])
-            ->name('meetings.manual-assign');
-
-        // Unassign volunteer
-        Route::post('/meetings/{meeting}/unassign', [MeetingController::class, 'unassign'])
-            ->name('meetings.unassign');
-
-        // Complete meeting
-        Route::post('/meetings/{meeting}/complete', [MeetingController::class, 'complete'])
-            ->name('meetings.complete');
-
-        // Cancel meeting
-        Route::post('/meetings/{meeting}/cancel', [MeetingController::class, 'cancel'])
-            ->name('meetings.cancel');
 
         // Send reminder SMS
         Route::post('/meetings/{meeting}/send-reminder', [SmsController::class, 'sendReminder'])
             ->name('meetings.send-reminder');
+
+        // Confirm / decline / cancel an assignment
+        Route::post('/meeting-assignments/{meetingAssignment}/confirm', [MeetingController::class, 'confirmAssignment'])
+            ->name('meeting-assignments.confirm');
+        Route::post('/meeting-assignments/{meetingAssignment}/decline', [MeetingController::class, 'declineAssignment'])
+            ->name('meeting-assignments.decline');
+        Route::post('/meeting-assignments/{meetingAssignment}/cancel', [MeetingController::class, 'cancelAssignment'])
+            ->name('meeting-assignments.cancel');
     });
 
     /*
@@ -276,7 +282,7 @@ Route::middleware(['auth', 'session_timeout'])->group(function () {
     Route::middleware('role:admin')->group(function () {
         // System settings, user management, audit logs, etc.
         Route::get('/admin/dashboard', function () {
-            return view('admin.dashboard');
+            return view('coordinator.dashboard');
         })->name('admin.dashboard');
 
         Route::get('/admin/audit-logs', function () {
@@ -294,3 +300,70 @@ Route::middleware(['auth', 'session_timeout'])->group(function () {
 Route::fallback(function () {
     return response()->view('errors.404', [], 404);
 });
+
+// Coordinator route aliases for dashboard
+Route::redirect('/coordinator/matching', '/meetings')->name('coordinator.matching');
+Route::redirect('/coordinator/facilities', '/facilities')->name('coordinator.facilities');
+
+// Coordinator route aliases
+Route::redirect('/coordinator/dashboard', '/')->name('coordinator.dashboard');
+Route::redirect('/coordinator/volunteers', '/volunteers')->name('coordinator.volunteers');
+Route::redirect('/coordinator/credentials', '/credentials')->name('coordinator.credentials');
+Route::redirect('/coordinator/sms-config', '/sms/configure')->name('coordinator.sms-config');
+
+// Volunteer route aliases
+Route::redirect('/volunteer/dashboard', '/')->name('volunteer.dashboard');
+Route::get('/volunteer/profile', function() {
+    $volunteer = \App\Models\Volunteer::where('email', auth()->user()->email)->first();
+    if (!$volunteer) {
+        return redirect()->route('dashboard')->with('error', 'No volunteer record linked to your account.');
+    }
+    return redirect("/volunteers/{$volunteer->volunteer_id}");
+})->middleware(['auth', 'session_timeout'])->name('volunteer.profile');
+
+Route::post('/volunteer/profile/update', function(\Illuminate\Http\Request $request) {
+    $volunteer = \App\Models\Volunteer::where('email', auth()->user()->email)->first();
+    if (!$volunteer) {
+        return redirect()->route('dashboard')->with('error', 'No volunteer record linked to your account.');
+    }
+    $validated = $request->validate([
+        'first_name'  => 'sometimes|string|max:255',
+        'last_name'   => 'sometimes|string|max:255',
+        'phone'       => 'sometimes|string|max:20',
+        'dob'         => 'sometimes|date',
+        'date_of_birth' => 'sometimes|date',
+        'gender'      => 'sometimes|string|max:50',
+        'clean_date'  => 'sometimes|date',
+        'neighborhood'=> 'sometimes|nullable|string|max:255',
+        'bus_line'    => 'sometimes|nullable|string|max:255',
+    ]);
+    // Map date_of_birth → dob if submitted that way
+    if (isset($validated['date_of_birth']) && !isset($validated['dob'])) {
+        $validated['dob'] = $validated['date_of_birth'];
+        unset($validated['date_of_birth']);
+    }
+    $volunteer->fill($validated)->save();
+    return redirect("/volunteers/{$volunteer->volunteer_id}")->with('success', 'Profile updated successfully.');
+})->middleware(['auth', 'session_timeout'])->name('volunteer.profile.update');
+
+Route::get('/volunteer/availability', function() {
+    $volunteer = \App\Models\Volunteer::where('email', auth()->user()->email)->first();
+    if (!$volunteer) {
+        return redirect()->route('dashboard')->with('error', 'No volunteer record linked to your account.');
+    }
+    return redirect("/volunteers/{$volunteer->volunteer_id}/availability");
+})->middleware(['auth', 'session_timeout'])->name('volunteer.availability');
+
+Route::get('/volunteer/assignments', function() {
+    $volunteer = \App\Models\Volunteer::where('email', auth()->user()->email)->first();
+    if (!$volunteer) {
+        return redirect()->route('dashboard')->with('error', 'No volunteer record linked to your account.');
+    }
+    return redirect("/volunteers/{$volunteer->volunteer_id}/meetings");
+})->middleware(['auth', 'session_timeout'])->name('volunteer.assignments');
+
+// Profile and reports aliases
+Route::get('/settings', function () {
+    return view('settings');
+})->middleware(['auth', 'session_timeout'])->name('profile.edit');
+Route::redirect('/reports/coverage', '/reports/coverage-summary')->name('reports.coverage');
