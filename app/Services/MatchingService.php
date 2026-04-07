@@ -1,127 +1,268 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Services;
 
 use App\Models\Meeting;
 use App\Models\Volunteer;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
 
+/**
+ * Scores and ranks volunteers as candidates for a specific meeting occurrence.
+ *
+ * Scoring is multi-dimensional: availability, credentials, prior experience,
+ * geographic proximity, and how recently the volunteer was last assigned.
+ * Each dimension produces a 0–100 score. The dimensions are then combined
+ * using configurable weights from config/chronosync.php so the balance can
+ * be tuned without changing code.
+ *
+ * Results are cached per meeting to reduce database load. The cache is
+ * invalidated whenever an assignment changes, keeping results accurate.
+ */
 class MatchingService
 {
-    public function getCandidates(Meeting $meeting)
+    /**
+     * Get a ranked list of candidate volunteers for a meeting.
+     *
+     * Uses the Cache-Aside pattern: serve from cache when available, otherwise
+     * query the database and populate the cache. TTL jitter (±30 seconds around
+     * 5 minutes) spreads expiry times across meetings so they don't all expire
+     * simultaneously and overwhelm the database (Thunder Herd prevention).
+     *
+     * @return Collection<int, array{volunteer_id: string, name: string, match_score: float, is_available: bool, scores: array<string, float>}>
+     */
+    public function getCandidates(Meeting $meeting): Collection
     {
-        $candidates = Volunteer::where('is_active', true)
-            ->with(['user', 'assignments', 'credentials'])
-            ->get()
-            ->map(fn($v) => $this->calculateMatchScore($v, $meeting))
-            ->filter(fn($v) => $v['match_score'] > 0)
-            ->sortByDesc('match_score')
-            ->values();
+        $cacheKey = "matching_candidates_{$meeting->meeting_id}";
+        $ttl      = 300 + random_int(-30, 30);
 
-        return $candidates;
+        return Cache::remember($cacheKey, $ttl, fn() => $this->fetchAndScoreCandidates($meeting));
     }
 
-    public function autoAssign(Meeting $meeting)
+    /**
+     * Return the single best-matching volunteer for auto-assignment.
+     *
+     * Fetches the top-scored candidate from the ranked list and loads the
+     * full Volunteer model so callers get an object they can work with directly.
+     * Returns null when no volunteer scores above zero.
+     */
+    public function autoAssign(Meeting $meeting): ?Volunteer
     {
-        $candidates = $this->getCandidates($meeting);
-        return $candidates->isEmpty() ? null : Volunteer::find($candidates->first()['id']);
+        $top = $this->getCandidates($meeting)->first();
+
+        if ($top === null) {
+            return null;
+        }
+
+        return Volunteer::find($top['volunteer_id']);
     }
 
-    public function getSuggestions(Meeting $meeting)
+    /**
+     * Return the next 2–3 candidates for coordinator review.
+     *
+     * Skips the top pick (reserved for auto-assign) and returns the runners-up
+     * so a coordinator can choose a good alternative or compare options.
+     */
+    public function getSuggestions(Meeting $meeting): Collection
     {
         return $this->getCandidates($meeting)->skip(1)->take(3)->values();
     }
 
-    private function calculateMatchScore(Volunteer $volunteer, Meeting $meeting): array
+    /**
+     * Clear the candidate cache for a meeting.
+     *
+     * Should be called any time an assignment is created, confirmed, declined,
+     * or cancelled so the next getCandidates() call reflects the current pool.
+     */
+    public function invalidateCandidateCache(Meeting $meeting): void
+    {
+        Cache::forget("matching_candidates_{$meeting->meeting_id}");
+    }
+
+    // -------------------------------------------------------------------------
+    // Private — candidate loading and scoring pipeline
+    // -------------------------------------------------------------------------
+
+    /**
+     * Load all active volunteers with their related data, score each one,
+     * filter out zero-score volunteers, and return the list ranked highest first.
+     *
+     * Eager-loading availability, credentials, and assignments in a single query
+     * prevents N+1 problems when the scoring methods inspect those relationships.
+     */
+    private function fetchAndScoreCandidates(Meeting $meeting): Collection
+    {
+        return Volunteer::withoutTrashed()
+            ->with(['user', 'assignments', 'credentials', 'availability'])
+            ->get()
+            ->map(fn(Volunteer $volunteer) => $this->scoreCandidate($volunteer, $meeting))
+            ->filter(fn(array $candidate) => $candidate['match_score'] > 0)
+            ->sortByDesc('match_score')
+            ->values();
+    }
+
+    /**
+     * Calculate a weighted composite score for one volunteer against one meeting.
+     *
+     * Each dimension is scored 0–100. The scores are multiplied by their weights
+     * (from config/chronosync.php) and summed to produce the final match_score.
+     * Storing the per-dimension scores in the result lets the UI show coordinators
+     * why a volunteer ranked where they did.
+     *
+     * @return array{volunteer_id: string, name: string, match_score: float, is_available: bool, scores: array<string, float>}
+     */
+    private function scoreCandidate(Volunteer $volunteer, Meeting $meeting): array
     {
         $scores = [
-            'availability' => $this->scoreAvailability($volunteer, $meeting),
-            'certifications' => $this->scoreCertifications($volunteer, $meeting),
-            'languages' => $this->scoreLanguages($volunteer, $meeting),
-            'facility' => $this->scoreFacilityFamiliarity($volunteer, $meeting),
-            'recency' => $this->scoreRecency($volunteer),
+            'availability_match'   => $this->scoreAvailability($volunteer, $meeting),
+            'credential_match'     => $this->scoreCredentials($volunteer, $meeting),
+            'previous_assignments' => $this->scorePreviousAssignments($volunteer, $meeting),
+            'geographic_proximity' => $this->scoreGeographicProximity($volunteer),
+            'volunteer_preference' => $this->scoreVolunteerPreference($volunteer),
         ];
 
-        $weights = ['availability' => 0.40, 'certifications' => 0.30, 'languages' => 0.15, 'facility' => 0.10, 'recency' => 0.05];
+        $weights = config('chronosync.matching.weights');
 
-        $total = 0;
-        foreach ($scores as $category => $score) {
-            $total += $score * $weights[$category];
-        }
+        // Multiply each dimension score by its configured weight and sum the results.
+        $totalScore = array_sum(array_map(
+            fn(string $dimension, float $score) => $score * ($weights[$dimension] ?? 0),
+            array_keys($scores),
+            $scores
+        ));
 
         return [
-            'id' => $volunteer->id,
-            'name' => $volunteer->user->full_name,
-            'match_score' => round($total, 2),
-            'is_available' => $scores['availability'] > 0,
+            'volunteer_id' => $volunteer->volunteer_id,
+            'name'         => $volunteer->full_name,
+            'match_score'  => round($totalScore, 2),
+            'is_available' => $scores['availability_match'] > 0,
+            'scores'       => $scores,
         ];
     }
 
+    /**
+     * Score whether the volunteer is free at the meeting's scheduled time.
+     *
+     * Looks up the volunteer's Availability records for the matching week-of-month
+     * and day-of-week, then checks whether the meeting's start hour falls inside
+     * an available slot. Returns:
+     *   100 — slot exists and volunteer marked it as available
+     *    25 — slot exists but volunteer marked it as unavailable
+     *     0 — no slot defined for this time (no data to indicate availability)
+     */
     private function scoreAvailability(Volunteer $volunteer, Meeting $meeting): float
     {
-        $availability = json_decode($volunteer->availability, true) ?? [];
-        if (empty($availability)) return 0;
+        // meeting_time is stored as HH:MM:SS — extract just the hour for comparison.
+        $meetingHour = (int) substr($meeting->meeting_time, 0, 2);
 
-        $dayOfWeek = $meeting->date_scheduled->dayOfWeek;
-        $weekNumber = intdiv($meeting->date_scheduled->day, 7);
-        if ($dayOfWeek === 0) $dayOfWeek = 6; else $dayOfWeek--;
+        $slot = $volunteer->availability
+            ->where('week_of_month', $meeting->week_of_month)
+            ->where('day_of_week', $meeting->day_of_week)
+            ->first(fn($s) => $s->hour_start <= $meetingHour && $s->hour_end > $meetingHour);
 
-        $slotIndex = ($weekNumber * 7) + $dayOfWeek;
-        if ($slotIndex >= count($availability)) return 50;
+        // Guard: no slot means we have no information — score zero rather than assume.
+        if ($slot === null) {
+            return 0;
+        }
 
-        return $availability[$slotIndex] ? 100 : 25;
+        return $slot->is_available ? 100 : 25;
     }
 
-    private function scoreCertifications(Volunteer $volunteer, Meeting $meeting): float
+    /**
+     * Score the volunteer's credentials for the meeting's specific facility.
+     *
+     * Only approved, non-expired credentials for the correct facility count.
+     * The score increases with the number of valid credentials because more
+     * credentials means the volunteer is cleared for more types of work there.
+     */
+    private function scoreCredentials(Volunteer $volunteer, Meeting $meeting): float
     {
-        $certs = json_decode($volunteer->certifications, true) ?? [];
-        if (empty($certs)) return 50;
+        $today = now()->toDateString();
 
-        $required = $this->getRequiredCerts($meeting->meeting_type);
-        if (empty($required)) return 75;
-
-        $matching = count(array_intersect($certs, $required));
-        return 50 + (($matching / count($required)) * 50);
-    }
-
-    private function scoreLanguages(Volunteer $volunteer, Meeting $meeting): float
-    {
-        $langs = json_decode($volunteer->languages, true) ?? [];
-        if (empty($langs) || in_array('English', $langs)) return 75;
-        return count($langs) >= 2 ? 90 : 80;
-    }
-
-    private function scoreFacilityFamiliarity(Volunteer $volunteer, Meeting $meeting): float
-    {
-        $prior = $volunteer->assignments()
-            ->whereHas('meeting', fn($q) => $q->where('facility_id', $meeting->facility_id))
+        $validCount = $volunteer->credentials
+            ->where('facility_id', $meeting->facility_id)
+            ->where('status', 'approved')
+            ->filter(fn($credential) => $credential->expiration_date === null
+                || $credential->expiration_date->toDateString() >= $today
+            )
             ->count();
 
-        if ($prior >= 5) return 100;
-        if ($prior >= 2) return 80;
-        if ($prior === 1) return 60;
+        return match (true) {
+            $validCount === 0 => 0,    // no valid credentials — likely not cleared for this facility
+            $validCount === 1 => 60,   // minimum clearance
+            $validCount === 2 => 80,   // well credentialed
+            default           => 100,  // fully credentialed (3 or more)
+        };
+    }
+
+    /**
+     * Score the volunteer's prior assignment history at this specific facility.
+     *
+     * Volunteers who have been to this facility before are familiar with the
+     * location, staff, and format — reducing the chance of confusion or no-shows.
+     */
+    private function scorePreviousAssignments(Volunteer $volunteer, Meeting $meeting): float
+    {
+        $priorCount = $volunteer->assignments
+            ->whereIn('status', ['confirmed', 'completed'])
+            ->filter(fn($assignment) => $assignment->meeting?->facility_id === $meeting->facility_id)
+            ->count();
+
+        return match (true) {
+            $priorCount >= 5  => 100,
+            $priorCount >= 2  => 80,
+            $priorCount === 1 => 60,
+            default           => 50,  // no prior experience is not disqualifying, just lower priority
+        };
+    }
+
+    /**
+     * Estimate how accessible the facility is for this volunteer.
+     *
+     * Uses bus_line and neighborhood as lightweight proxies for transit access.
+     * A proper geo-distance calculation would require coordinates that are not
+     * currently stored in the database.
+     */
+    private function scoreGeographicProximity(Volunteer $volunteer): float
+    {
+        // A listed bus line is a strong signal the volunteer can reach any facility via transit.
+        if (!empty($volunteer->bus_line)) {
+            return 80;
+        }
+
+        // A listed neighborhood provides partial geographic context.
+        if (!empty($volunteer->neighborhood)) {
+            return 60;
+        }
+
+        // No location data — use a neutral mid-point rather than penalising the volunteer.
         return 50;
     }
 
-    private function scoreRecency(Volunteer $volunteer): float
+    /**
+     * Prefer volunteers who have not been assigned recently.
+     *
+     * Spreading assignments across the active volunteer pool prevents a small
+     * group from bearing the entire load. Volunteers who haven't been assigned
+     * in a month or more are treated as highest priority.
+     */
+    private function scoreVolunteerPreference(Volunteer $volunteer): float
     {
-        $last = $volunteer->assignments()->latest('created_at')->first();
-        if (!$last) return 100;
+        $lastAssignment = $volunteer->assignments->sortByDesc('created_at')->first();
 
-        $days = now()->diffInDays($last->created_at);
-        if ($days >= 30) return 100;
-        if ($days >= 14) return 90;
-        if ($days >= 7) return 80;
-        return 60;
-    }
+        // Guard: never assigned means they are very available and eager — highest score.
+        if ($lastAssignment === null) {
+            return 100;
+        }
 
-    private function getRequiredCerts(string $type): array
-    {
-        $certs = [
-            'peer_support' => ['peer support'],
-            'workshop' => ['facilitator'],
-            'individual' => ['training'],
-            'group' => [],
-        ];
-        return $certs[$type] ?? [];
+        $daysSinceLast = now()->diffInDays($lastAssignment->created_at);
+
+        return match (true) {
+            $daysSinceLast >= 30 => 100,
+            $daysSinceLast >= 14 => 90,
+            $daysSinceLast >= 7  => 80,
+            default              => 60,
+        };
     }
 }

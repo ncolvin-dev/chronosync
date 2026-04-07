@@ -1,119 +1,152 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Http\Controllers;
 
+use App\Jobs\SendSmsJob;
 use App\Models\Meeting;
 use App\Models\MeetingAssignment;
-use App\Models\Volunteer;
 use App\Services\MatchingService;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
+/**
+ * Exposes the volunteer matching algorithm as JSON API endpoints.
+ *
+ * These endpoints are consumed by the coordinator dashboard via AJAX.
+ * All three actions are protected by role middleware in routes/web.php
+ * and additionally guarded by the inherited authorizeCoordinatorOrAdmin() check.
+ *
+ * MatchingService is injected through the constructor so the controller
+ * depends on the abstraction, not the concrete implementation.
+ */
 class MatchingController extends Controller
 {
-    protected MatchingService $matchingService;
-
-    public function __construct(MatchingService $matchingService)
-    {
-        $this->matchingService = $matchingService;
-    }
+    public function __construct(private readonly MatchingService $matchingService) {}
 
     /**
-     * Get ordered list of matching candidates for a meeting.
+     * Return a ranked list of candidate volunteers for a meeting.
+     *
+     * Each candidate includes a score breakdown so the coordinator can see
+     * which dimensions drove their ranking. The 'already_assigned' flag lets
+     * the UI disable the assign button for volunteers already on this occurrence.
+     *
+     * getCandidates() returns an array collection (not Eloquent models), so
+     * each item is accessed with array syntax: $candidate['key'].
      */
-    public function getCandidates(Meeting $meeting)
+    public function getCandidates(Meeting $meeting): JsonResponse
     {
         $this->authorizeCoordinatorOrAdmin();
 
+        $today      = now()->toDateString();
         $candidates = $this->matchingService->getCandidates($meeting);
 
-        return response()->json([
-            'candidates' => $candidates->map(function ($volunteer) use ($meeting) {
-                $assignment = $meeting->assignments()
-                    ->where('volunteer_id', $volunteer->id)
-                    ->first();
+        $payload = $candidates->map(function (array $candidate) use ($meeting, $today) {
+            // Check whether this volunteer already has an active assignment for today's date.
+            $alreadyAssigned = $meeting->assignments()
+                ->where('volunteer_id', $candidate['volunteer_id'])
+                ->where('assignment_date', $today)
+                ->whereIn('status', ['pending_confirmation', 'confirmed'])
+                ->exists();
 
-                return [
-                    'id' => $volunteer->id,
-                    'name' => $volunteer->user->full_name,
-                    'email' => $volunteer->user->email,
-                    'phone' => $volunteer->phone,
-                    'match_score' => $volunteer->match_score ?? 0,
-                    'is_available' => $volunteer->is_available ?? false,
-                    'languages' => json_decode($volunteer->languages, true) ?? [],
-                    'certifications' => json_decode($volunteer->certifications, true) ?? [],
-                    'already_assigned' => (bool) $assignment,
-                ];
-            }),
-        ]);
+            return [
+                'volunteer_id'    => $candidate['volunteer_id'],
+                'name'            => $candidate['name'],
+                'match_score'     => $candidate['match_score'],
+                'is_available'    => $candidate['is_available'],
+                'already_assigned'=> $alreadyAssigned,
+                'score_breakdown' => $candidate['scores'],
+            ];
+        });
+
+        return response()->json(['candidates' => $payload]);
     }
 
     /**
-     * Auto-assign top matching candidate to meeting.
+     * Automatically assign the top-scoring volunteer to a specific meeting occurrence.
+     *
+     * Validates that a target date is provided, checks the volunteer cap, creates
+     * the assignment, and queues an SMS confirmation. The cache is invalidated so
+     * the next getCandidates() call reflects the updated pool.
+     *
+     * Models use ULID primary keys — always reference meeting_id and volunteer_id,
+     * never the generic ->id accessor which returns null for non-standard PKs.
      */
-    public function autoAssign(Request $request, Meeting $meeting)
+    public function autoAssign(Request $request, Meeting $meeting): JsonResponse
     {
         $this->authorizeCoordinatorOrAdmin();
 
+        $validated = $request->validate([
+            'assignment_date' => 'required|date|after_or_equal:today',
+        ]);
+
+        $dateStr   = $validated['assignment_date'];
         $candidate = $this->matchingService->autoAssign($meeting);
 
-        if (!$candidate) {
-            return response()->json([
-                'success' => false,
-                'message' => 'No suitable volunteers available.',
-            ], 400);
+        // Guard: no candidates means the volunteer pool is empty or no one scored above zero.
+        if ($candidate === null) {
+            return response()->json(['success' => false, 'message' => 'No suitable volunteers available.'], 400);
         }
 
+        // Guard: respect the per-occurrence volunteer cap before creating the assignment.
+        $currentCount = $meeting->activeAssignmentsForDate($dateStr)->count();
+
+        if ($currentCount >= $meeting->volunteers_needed) {
+            return response()->json([
+                'success' => false,
+                'message' => "This occurrence already has {$meeting->volunteers_needed} volunteer(s) assigned.",
+            ], 422);
+        }
+
+        // Both models use ULIDs as their primary keys — use the named key columns,
+        // not ->id, which returns null when the PK column has a non-standard name.
         $assignment = MeetingAssignment::create([
-            'meeting_id' => $meeting->id,
-            'volunteer_id' => $candidate->id,
-            'status' => 'pending_confirmation',
+            'meeting_id'      => $meeting->meeting_id,
+            'volunteer_id'    => $candidate->volunteer_id,
+            'assignment_date' => $dateStr,
+            'status'          => 'pending_confirmation',
             'assignment_type' => 'auto',
         ]);
 
+        // Invalidate the cache so the next candidate list reflects the assignment.
+        $this->matchingService->invalidateCandidateCache($meeting);
+
+        // Dispatch SMS as a queued job so the HTTP response returns immediately.
+        // Provider latency and failures are handled by the job's retry logic.
+        if ($candidate->is_sms_deliverable) {
+            SendSmsJob::dispatch($assignment, 'confirmation_request');
+        }
+
         return response()->json([
-            'success' => true,
-            'message' => "Volunteer {$candidate->user->full_name} assigned.",
-            'assignment_id' => $assignment->id,
-            'volunteer_id' => $candidate->id,
-            'volunteer_name' => $candidate->user->full_name,
+            'success'        => true,
+            'message'        => "Volunteer {$candidate->full_name} assigned.",
+            'assignment_id'  => $assignment->meeting_assignment_id,
+            'volunteer_id'   => $candidate->volunteer_id,
+            'volunteer_name' => $candidate->full_name,
         ]);
     }
 
     /**
-     * Get 2-3 alternate suggestions for coordinator.
+     * Return the next 2–3 best candidates after the top pick.
+     *
+     * Gives the coordinator alternatives to review when they want to choose
+     * manually rather than accepting the auto-assign recommendation.
+     * Candidates are arrays — access with bracket syntax, not object notation.
      */
-    public function getSuggestions(Request $request, Meeting $meeting)
+    public function getSuggestions(Request $request, Meeting $meeting): JsonResponse
     {
         $this->authorizeCoordinatorOrAdmin();
 
         $suggestions = $this->matchingService->getSuggestions($meeting);
 
-        return response()->json([
-            'suggestions' => $suggestions->map(function ($volunteer) {
-                return [
-                    'id' => $volunteer->id,
-                    'name' => $volunteer->user->full_name,
-                    'email' => $volunteer->user->email,
-                    'phone' => $volunteer->phone,
-                    'match_score' => $volunteer->match_score ?? 0,
-                    'reason' => $volunteer->match_reason ?? 'Good match for this meeting',
-                    'languages' => json_decode($volunteer->languages, true) ?? [],
-                    'certifications' => json_decode($volunteer->certifications, true) ?? [],
-                ];
-            }),
+        $payload = $suggestions->map(fn(array $candidate) => [
+            'volunteer_id' => $candidate['volunteer_id'],
+            'name'         => $candidate['name'],
+            'match_score'  => $candidate['match_score'],
+            'is_available' => $candidate['is_available'],
         ]);
-    }
 
-    /**
-     * Authorize coordinator or admin.
-     */
-    private function authorizeCoordinatorOrAdmin()
-    {
-        $user = auth()->user();
-        $roles = is_array($user->roles) ? $user->roles : json_decode($user->roles, true) ?? [];
-
-        if (!in_array('coordinator', $roles) && !in_array('admin', $roles)) {
-            abort(403);
-        }
+        return response()->json(['suggestions' => $payload]);
     }
 }

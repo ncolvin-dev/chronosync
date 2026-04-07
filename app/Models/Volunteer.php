@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use App\Models\MeetingAssignment;
 
 /**
  * Volunteer Model
@@ -187,13 +188,34 @@ class Volunteer extends Model
     }
 
     /**
-     * Relationship: Meetings assigned to this volunteer.
+     * Relationship: Individual assignment records for this volunteer.
      *
-     * @return \Illuminate\Database\Eloquent\Relations\HasMany
+     * Each MeetingAssignment links a volunteer to one specific occurrence of a
+     * recurring meeting (identified by meeting_id + assignment_date). This is the
+     * join table between volunteers and meetings.
      */
-    public function meetings()
+    public function assignments(): \Illuminate\Database\Eloquent\Relations\HasMany
     {
-        return $this->hasMany(Meeting::class, 'assigned_volunteer_id', 'volunteer_id');
+        return $this->hasMany(MeetingAssignment::class, 'volunteer_id', 'volunteer_id');
+    }
+
+    /**
+     * Relationship: Recurring meeting slots this volunteer participates in.
+     *
+     * Uses a many-to-many relationship through the meeting_assignments table.
+     * The pivot carries the date, status, and assignment type for each occurrence.
+     */
+    public function meetings(): \Illuminate\Database\Eloquent\Relations\BelongsToMany
+    {
+        return $this->belongsToMany(
+            Meeting::class,
+            'meeting_assignments',
+            'volunteer_id',
+            'meeting_id',
+            'volunteer_id',
+            'meeting_id'
+        )->withPivot(['assignment_date', 'status', 'assignment_type', 'confirmed_at'])
+         ->withTimestamps();
     }
 
     /**
