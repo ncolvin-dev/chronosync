@@ -35,4 +35,16 @@ return [
         ],
     ],
 
+    /*
+     * Twilio SMS credentials.
+     * These are kept here (rather than in config/chronosync.php) because
+     * config/services.php is the Laravel convention for third-party API secrets.
+     * Feature flags and behavior settings live in config/chronosync.php.
+     */
+    'twilio' => [
+        'account_sid' => env('TWILIO_ACCOUNT_SID'),
+        'auth_token'  => env('TWILIO_AUTH_TOKEN'),
+        'from_number' => env('TWILIO_FROM_NUMBER'),
+    ],
+
 ];

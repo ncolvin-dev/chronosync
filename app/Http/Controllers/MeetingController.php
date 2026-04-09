@@ -1,21 +1,41 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Http\Controllers;
 
+use App\Jobs\SendSmsJob;
+use App\Models\AuditLog;
+use App\Models\Facility;
 use App\Models\Meeting;
 use App\Models\MeetingAssignment;
-use App\Models\Facility;
 use App\Models\Volunteer;
-use App\Models\AuditLog;
 use App\Services\SmsService;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Carbon\Carbon;
 
+/**
+ * Manages recurring meeting slots and individual occurrence assignments.
+ *
+ * Recurring meetings are templates (day-of-week + week-of-month pattern).
+ * MeetingAssignments link volunteers to specific calendar dates derived from those templates.
+ * SMS notifications are dispatched as queued jobs so they never block the HTTP response.
+ */
 class MeetingController extends Controller
 {
     /**
+     * SmsService is injected by Laravel's container.
+     * Injecting through the constructor decouples the controller from the concrete
+     * implementation and makes it straightforward to swap or mock in tests.
+     */
+    public function __construct(private readonly SmsService $smsService) {}
+
+    /**
      * List recurring meeting slots with optional filters.
+     *
+     * Supports filtering by facility, status, format, day of week, and whether
+     * upcoming occurrences are already assigned. Results are paginated.
      */
     public function index(Request $request)
     {
@@ -23,41 +43,29 @@ class MeetingController extends Controller
 
         $query = Meeting::with('facility')->withoutTrashed();
 
-        // Filter by facility
+        // Each filter is applied only when a value is present in the request.
+        // This keeps the query clean — unset filters add no WHERE clauses.
         if ($request->filled('facility_id')) {
             $query->where('facility_id', $request->facility_id);
         }
 
-        // Filter by status (active/inactive meeting slots)
         if ($request->filled('status')) {
             $query->where('status', $request->status);
         }
 
-        // Filter by format
         if ($request->filled('format')) {
             $query->where('format', $request->format);
         }
 
-        // Filter by day of week
         if ($request->filled('day_of_week')) {
             $query->where('day_of_week', $request->day_of_week);
         }
 
-        // Filter by assignment status for the upcoming occurrence
+        // Assignment status filter checks whether upcoming occurrences have
+        // active assignments (confirmed or awaiting confirmation).
         if ($request->filled('assignment_status')) {
             $today = now()->toDateString();
-            if ($request->assignment_status === 'unassigned') {
-                // Meetings whose next occurrence has fewer confirmed/pending assignments than needed
-                $query->whereDoesntHave('assignments', function ($q) use ($today) {
-                    $q->whereIn('status', ['confirmed', 'pending_confirmation'])
-                      ->where('assignment_date', '>=', $today);
-                });
-            } elseif ($request->assignment_status === 'assigned') {
-                $query->whereHas('assignments', function ($q) use ($today) {
-                    $q->whereIn('status', ['confirmed', 'pending_confirmation'])
-                      ->where('assignment_date', '>=', $today);
-                });
-            }
+            $this->applyAssignmentStatusFilter($query, $request->assignment_status, $today);
         }
 
         $meetings = $query
@@ -75,6 +83,9 @@ class MeetingController extends Controller
 
     /**
      * Store a new recurring meeting slot.
+     *
+     * The meeting is wrapped in a transaction so the audit log record is created
+     * atomically with the meeting itself.
      */
     public function store(Request $request)
     {
@@ -118,7 +129,10 @@ class MeetingController extends Controller
     }
 
     /**
-     * Show meeting slot details and upcoming occurrences with assignments.
+     * Show meeting slot details and its upcoming occurrences with assignments.
+     *
+     * Calculates the next three months of occurrence dates from the recurring pattern
+     * and loads the assignments already recorded for each one.
      */
     public function show(Meeting $meeting)
     {
@@ -126,38 +140,21 @@ class MeetingController extends Controller
 
         $meeting->load('facility');
 
-        // Build the next 3 months of occurrences with their assignments
-        $occurrences = [];
-        $now = now();
-        for ($m = 0; $m < 3; $m++) {
-            $year  = $now->copy()->addMonths($m)->year;
-            $month = $now->copy()->addMonths($m)->month;
-            $date  = $meeting->occurrenceInMonth($year, $month);
+        $occurrences = $this->buildUpcomingOccurrences($meeting);
 
-            if ($date && $date->gte($now->startOfDay())) {
-                $dateStr     = $date->toDateString();
-                $assignments = $meeting->assignmentsForDate($dateStr)
-                    ->with('volunteer')
-                    ->get();
-
-                $occurrences[] = [
-                    'date'        => $date,
-                    'date_str'    => $dateStr,
-                    'assignments' => $assignments,
-                    'filled'      => $assignments->whereIn('status', ['confirmed', 'pending_confirmation'])->count(),
-                    'needed'      => $meeting->volunteers_needed,
-                ];
-            }
-        }
-
-        // Available volunteers (for manual assignment UI)
+        // Load all active volunteers for the manual assignment dropdown in the view.
         $volunteers = Volunteer::withoutTrashed()->orderBy('last_name')->get();
 
         return view('placeholder.coming-soon', compact('meeting', 'occurrences', 'volunteers'));
     }
 
     /**
-     * Assign a volunteer to a specific occurrence (auto or manual).
+     * Assign a volunteer to a specific occurrence of a recurring meeting.
+     *
+     * Enforces the volunteer cap and prevents duplicate assignments for the same date.
+     * The DB transaction commits both the assignment and the audit log together.
+     * SMS is dispatched after the transaction so a provider failure can never
+     * roll back a successful assignment.
      */
     public function assign(Request $request, Meeting $meeting)
     {
@@ -170,27 +167,28 @@ class MeetingController extends Controller
             'override_reason' => 'nullable|string|max:500',
         ]);
 
-        return DB::transaction(function () use ($validated, $meeting) {
-            $dateStr  = $validated['assignment_date'];
-            $type     = $validated['assignment_type'] ?? 'manual';
+        $dateStr = $validated['assignment_date'];
+        $type    = $validated['assignment_type'] ?? 'manual';
 
-            // Enforce the 5-volunteer cap
-            $current = $meeting->activeAssignmentsForDate($dateStr)->count();
-            if ($current >= $meeting->volunteers_needed) {
-                return back()->with('error', "This occurrence already has {$meeting->volunteers_needed} volunteer(s) assigned.");
-            }
+        // Guard: check the volunteer cap before touching the database.
+        $current = $meeting->activeAssignmentsForDate($dateStr)->count();
+        if ($current >= $meeting->volunteers_needed) {
+            return back()->with('error', "This occurrence already has {$meeting->volunteers_needed} volunteer(s) assigned.");
+        }
 
-            // Prevent duplicate assignment
-            $existing = MeetingAssignment::where('meeting_id', $meeting->meeting_id)
-                ->where('volunteer_id', $validated['volunteer_id'])
-                ->where('assignment_date', $dateStr)
-                ->whereIn('status', ['pending_confirmation', 'confirmed'])
-                ->first();
+        // Guard: prevent assigning the same volunteer to the same date twice.
+        $alreadyAssigned = MeetingAssignment::where('meeting_id', $meeting->meeting_id)
+            ->where('volunteer_id', $validated['volunteer_id'])
+            ->where('assignment_date', $dateStr)
+            ->whereIn('status', ['pending_confirmation', 'confirmed'])
+            ->exists();
 
-            if ($existing) {
-                return back()->with('error', 'This volunteer is already assigned to this occurrence.');
-            }
+        if ($alreadyAssigned) {
+            return back()->with('error', 'This volunteer is already assigned to this occurrence.');
+        }
 
+        // Wrap both DB writes in a transaction so they succeed or fail together.
+        $assignment = DB::transaction(function () use ($validated, $meeting, $dateStr, $type) {
             $assignment = MeetingAssignment::create([
                 'meeting_id'      => $meeting->meeting_id,
                 'volunteer_id'    => $validated['volunteer_id'],
@@ -213,42 +211,43 @@ class MeetingController extends Controller
                 ],
             ]);
 
-            // Send SMS confirmation request
-            $volunteer = Volunteer::find($validated['volunteer_id']);
-            if ($volunteer && $volunteer->is_sms_deliverable) {
-                try {
-                    $smsService = new SmsService();
-                    $smsService->sendConfirmationRequest($assignment);
-                } catch (\Exception $e) {
-                    // SMS failure should not block assignment
-                }
-            }
-
-            return back()->with('success', 'Volunteer assigned and confirmation request sent.');
+            return $assignment;
         });
+
+        // SMS is dispatched after the transaction commits.
+        // A queued job means provider latency does not affect response time,
+        // and a provider outage cannot roll back the successfully saved assignment.
+        if ($assignment->volunteer?->is_sms_deliverable) {
+            SendSmsJob::dispatch($assignment, 'confirmation_request');
+        }
+
+        return back()->with('success', 'Volunteer assigned and confirmation request sent.');
     }
 
     /**
-     * Confirm an assignment (volunteer or coordinator confirming).
+     * Confirm a pending assignment.
+     *
+     * Status can only move from pending_confirmation → confirmed.
+     * Any other starting status is rejected with an error message.
      */
     public function confirmAssignment(Request $request, MeetingAssignment $meetingAssignment)
     {
         $this->authorizeCoordinatorOrAdmin();
-        $assignment = $meetingAssignment;
 
-        if ($assignment->status !== 'pending_confirmation') {
+        // Guard: only pending assignments can be confirmed.
+        if ($meetingAssignment->status !== 'pending_confirmation') {
             return back()->with('error', 'Assignment is not in a pending state.');
         }
 
-        $assignment->status       = 'confirmed';
-        $assignment->confirmed_at = now();
-        $assignment->save();
+        $meetingAssignment->status       = 'confirmed';
+        $meetingAssignment->confirmed_at = now();
+        $meetingAssignment->save();
 
         AuditLog::create([
             'actor_user_id'  => auth()->id(),
             'action'         => 'confirm_assignment',
             'entity_type'    => 'meeting_assignments',
-            'entity_id'      => $assignment->meeting_assignment_id,
+            'entity_id'      => $meetingAssignment->meeting_assignment_id,
             'change_details' => ['status' => ['old' => 'pending_confirmation', 'new' => 'confirmed']],
         ]);
 
@@ -256,70 +255,72 @@ class MeetingController extends Controller
     }
 
     /**
-     * Decline an assignment (volunteer responding via SMS or coordinator removing).
+     * Mark an assignment as declined.
+     *
+     * Used when a volunteer responds NO via SMS or a coordinator manually records
+     * a refusal. Triggers no SMS — the volunteer's response is the trigger.
      */
     public function declineAssignment(Request $request, MeetingAssignment $meetingAssignment)
     {
         $this->authorizeCoordinatorOrAdmin();
-        $assignment = $meetingAssignment;
 
-        $assignment->status = 'declined';
-        $assignment->save();
+        $oldStatus                 = $meetingAssignment->status;
+        $meetingAssignment->status = 'declined';
+        $meetingAssignment->save();
 
         AuditLog::create([
             'actor_user_id'  => auth()->id(),
             'action'         => 'decline_assignment',
             'entity_type'    => 'meeting_assignments',
-            'entity_id'      => $assignment->meeting_assignment_id,
-            'change_details' => ['status' => ['old' => $assignment->getOriginal('status'), 'new' => 'declined']],
+            'entity_id'      => $meetingAssignment->meeting_assignment_id,
+            'change_details' => ['status' => ['old' => $oldStatus, 'new' => 'declined']],
         ]);
 
         return back()->with('success', 'Assignment declined.');
     }
 
     /**
-     * Cancel an assignment (coordinator removing a volunteer from an occurrence).
+     * Cancel an assignment and notify the volunteer.
+     *
+     * The cancellation is saved first so it succeeds even if the SMS fails.
+     * The SMS job is dispatched after the save — failure there does not undo the cancellation.
      */
     public function cancelAssignment(Request $request, MeetingAssignment $meetingAssignment)
     {
         $this->authorizeCoordinatorOrAdmin();
-        $assignment = $meetingAssignment;
 
         $validated = $request->validate([
             'reason' => 'nullable|string|max:500',
         ]);
 
-        $oldStatus         = $assignment->status;
-        $assignment->status = 'cancelled';
-        $assignment->save();
+        $oldStatus                 = $meetingAssignment->status;
+        $meetingAssignment->status = 'cancelled';
+        $meetingAssignment->save();
 
         AuditLog::create([
             'actor_user_id'  => auth()->id(),
             'action'         => 'cancel_assignment',
             'entity_type'    => 'meeting_assignments',
-            'entity_id'      => $assignment->meeting_assignment_id,
+            'entity_id'      => $meetingAssignment->meeting_assignment_id,
             'change_details' => [
                 'status' => ['old' => $oldStatus, 'new' => 'cancelled'],
                 'reason' => $validated['reason'] ?? null,
             ],
         ]);
 
-        // Notify volunteer of cancellation
-        $volunteer = $assignment->volunteer;
-        if ($volunteer && $volunteer->is_sms_deliverable) {
-            try {
-                $smsService = new SmsService();
-                $smsService->sendCancellation($assignment);
-            } catch (\Exception $e) {
-                // SMS failure should not block cancellation
-            }
+        // Notify the volunteer so they are not waiting at the facility unnecessarily.
+        if ($meetingAssignment->volunteer?->is_sms_deliverable) {
+            SendSmsJob::dispatch($meetingAssignment, 'cancellation');
         }
 
         return back()->with('success', 'Assignment cancelled and volunteer notified.');
     }
 
     /**
-     * Mark an entire recurring meeting slot as inactive (deactivate it).
+     * Mark a recurring meeting slot as inactive.
+     *
+     * Inactive slots remain in the database for historical reporting but no
+     * longer appear in the active scheduling queue.
      */
     public function deactivate(Request $request, Meeting $meeting)
     {
@@ -340,7 +341,7 @@ class MeetingController extends Controller
     }
 
     /**
-     * Reactivate a previously inactive meeting slot.
+     * Restore a previously deactivated meeting slot to active scheduling.
      */
     public function activate(Request $request, Meeting $meeting)
     {
@@ -361,7 +362,10 @@ class MeetingController extends Controller
     }
 
     /**
-     * Soft-delete a recurring meeting slot and cancel future assignments.
+     * Soft-delete a recurring meeting slot and cancel all future assignments.
+     *
+     * Both operations are wrapped in a transaction so the database never ends up
+     * with a deleted meeting that still has live assignments attached.
      */
     public function destroy(Meeting $meeting)
     {
@@ -370,7 +374,8 @@ class MeetingController extends Controller
         return DB::transaction(function () use ($meeting) {
             $today = now()->toDateString();
 
-            // Cancel all future pending/confirmed assignments
+            // Cancel upcoming assignments before deleting so volunteers' records
+            // reflect the cancellation rather than pointing at a deleted meeting.
             $meeting->assignments()
                 ->where('assignment_date', '>=', $today)
                 ->whereIn('status', ['pending_confirmation', 'confirmed'])
@@ -391,16 +396,76 @@ class MeetingController extends Controller
         });
     }
 
-    /**
-     * Authorize coordinator or admin only.
-     */
-    private function authorizeCoordinatorOrAdmin()
-    {
-        $user  = auth()->user();
-        $roles = is_array($user->roles) ? $user->roles : json_decode($user->roles, true) ?? [];
+    // -------------------------------------------------------------------------
+    // Private helpers
+    // -------------------------------------------------------------------------
 
-        if (!in_array('coordinator', $roles) && !in_array('admin', $roles)) {
-            abort(403);
+    /**
+     * Apply an assignment-status filter to the meeting query.
+     *
+     * Extracted into its own method to keep index() easy to scan — the filter
+     * logic would otherwise add significant nesting to an already busy method.
+     *
+     * @param \Illuminate\Database\Eloquent\Builder $query
+     * @param string $status 'unassigned' or 'assigned'
+     * @param string $today  Date string in Y-m-d format.
+     */
+    private function applyAssignmentStatusFilter($query, string $status, string $today): void
+    {
+        if ($status === 'unassigned') {
+            // Meetings whose next occurrence has no active assignments yet.
+            $query->whereDoesntHave('assignments', function ($q) use ($today) {
+                $q->whereIn('status', ['confirmed', 'pending_confirmation'])
+                  ->where('assignment_date', '>=', $today);
+            });
+            return;
         }
+
+        if ($status === 'assigned') {
+            // Meetings that have at least one active assignment on an upcoming date.
+            $query->whereHas('assignments', function ($q) use ($today) {
+                $q->whereIn('status', ['confirmed', 'pending_confirmation'])
+                  ->where('assignment_date', '>=', $today);
+            });
+        }
+    }
+
+    /**
+     * Build the list of upcoming occurrence data for the show view.
+     *
+     * Calculates the occurrence date for each of the next three calendar months
+     * using the meeting's day-of-week + week-of-month pattern, then loads the
+     * assignments already recorded for each date.
+     *
+     * @return array<int, array{date: \Carbon\Carbon, date_str: string, assignments: mixed, filled: int, needed: int}>
+     */
+    private function buildUpcomingOccurrences(Meeting $meeting): array
+    {
+        $now         = now();
+        $occurrences = [];
+
+        for ($monthOffset = 0; $monthOffset < 3; $monthOffset++) {
+            $year  = $now->copy()->addMonths($monthOffset)->year;
+            $month = $now->copy()->addMonths($monthOffset)->month;
+            $date  = $meeting->occurrenceInMonth($year, $month);
+
+            // Skip months where the occurrence has already passed.
+            if (!$date || $date->lt($now->startOfDay())) {
+                continue;
+            }
+
+            $dateStr     = $date->toDateString();
+            $assignments = $meeting->assignmentsForDate($dateStr)->with('volunteer')->get();
+
+            $occurrences[] = [
+                'date'        => $date,
+                'date_str'    => $dateStr,
+                'assignments' => $assignments,
+                'filled'      => $assignments->whereIn('status', ['confirmed', 'pending_confirmation'])->count(),
+                'needed'      => $meeting->volunteers_needed,
+            ];
+        }
+
+        return $occurrences;
     }
 }

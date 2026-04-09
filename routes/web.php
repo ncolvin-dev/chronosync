@@ -184,17 +184,27 @@ Route::middleware(['auth', 'session_timeout'])->group(function () {
     |----------------------------------------------------------------------
     | Matching API Routes (Coordinator/Admin)
     |----------------------------------------------------------------------
+    |
+    | Read endpoints allow 60 requests per minute per authenticated user —
+    | enough for interactive use while protecting against runaway clients.
+    | The auto-assign write endpoint is capped at 10 per minute because it
+    | mutates data, triggers downstream jobs, and hits the database harder.
+    |
     */
 
-    Route::middleware('role:coordinator,admin')->group(function () {
+    // Read endpoints — candidates and suggestions lists
+    Route::middleware(['role:coordinator,admin', 'throttle:60,1'])->group(function () {
         Route::get('/api/meetings/{meeting}/candidates', [MatchingController::class, 'getCandidates'])
             ->name('api.candidates');
 
-        Route::post('/api/meetings/{meeting}/auto-assign', [MatchingController::class, 'autoAssign'])
-            ->name('api.auto-assign');
-
         Route::get('/api/meetings/{meeting}/suggestions', [MatchingController::class, 'getSuggestions'])
             ->name('api.suggestions');
+    });
+
+    // Write endpoint — auto-assign gets a tighter rate limit
+    Route::middleware(['role:coordinator,admin', 'throttle:10,1'])->group(function () {
+        Route::post('/api/meetings/{meeting}/auto-assign', [MatchingController::class, 'autoAssign'])
+            ->name('api.auto-assign');
     });
 
     /*
