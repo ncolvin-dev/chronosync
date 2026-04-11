@@ -369,7 +369,7 @@ Route::get('/volunteer/assignments', function() {
     if (!$volunteer) {
         return redirect()->route('dashboard')->with('error', 'No volunteer record linked to your account.');
     }
-    return redirect("/volunteers/{$volunteer->volunteer_id}/meetings");
+    return view('volunteer.assignments', compact('volunteer'));
 })->middleware(['auth', 'session_timeout'])->name('volunteer.assignments');
 
 // Profile and reports aliases

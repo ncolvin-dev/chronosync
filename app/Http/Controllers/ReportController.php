@@ -335,16 +335,4 @@ class ReportController extends Controller
             ->toArray();
     }
 
-    /**
-     * Authorize coordinator or admin.
-     */
-    private function authorizeCoordinatorOrAdmin()
-    {
-        $user = auth()->user();
-        $roles = is_array($user->roles) ? $user->roles : json_decode($user->roles, true) ?? [];
-
-        if (!in_array('coordinator', $roles) && !in_array('admin', $roles)) {
-            abort(403);
-        }
-    }
 }
