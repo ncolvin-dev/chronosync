@@ -236,57 +236,73 @@
     .btn-view {
         background-color: #0099cc;
         color: white;
+        text-decoration: none;
+        display: inline-block;
+        text-align: center;
     }
 
     .btn-view:hover {
         background-color: #003366;
-    }
-
-    .btn-edit {
-        background-color: #28a745;
         color: white;
     }
 
+    .btn-edit {
+        background-color: #003366;
+        color: white;
+        text-decoration: none;
+        display: inline-block;
+        text-align: center;
+    }
+
     .btn-edit:hover {
-        background-color: #218838;
+        background-color: #002244;
+        color: white;
     }
 
     .pagination {
         display: flex;
         justify-content: center;
-        gap: 0.5rem;
+        align-items: center;
+        gap: 0.35rem;
         margin-top: 1.5rem;
         padding-top: 1rem;
         border-top: 1px solid #e0e0e0;
+        list-style: none;
+        padding-left: 0;
+        margin-bottom: 0;
     }
 
-    .pagination button,
-    .pagination a {
-        padding: 0.5rem 0.75rem;
-        background-color: #f0f0f0;
+    .pagination li a,
+    .pagination li span {
+        display: inline-block;
+        padding: 0.5rem 0.85rem;
+        background-color: white;
         border: 1px solid #ddd;
         border-radius: 0.5rem;
-        cursor: pointer;
-        transition: all 0.3s;
-        color: #666;
+        transition: all 0.2s;
+        color: #003366;
         text-decoration: none;
         font-weight: 600;
+        font-size: 0.875rem;
+        line-height: 1;
     }
 
-    .pagination button:hover,
-    .pagination a:hover {
-        background-color: #e0e0e0;
-    }
-
-    .pagination .active {
+    .pagination li a:hover {
         background-color: #0099cc;
-        color: white;
         border-color: #0099cc;
+        color: white;
     }
 
-    .pagination .disabled {
-        opacity: 0.5;
+    .pagination li.active span {
+        background-color: #0099cc;
+        border-color: #0099cc;
+        color: white;
+    }
+
+    .pagination li.disabled span {
+        opacity: 0.45;
         cursor: not-allowed;
+        color: #999;
     }
 
     .empty-state {
@@ -312,6 +328,125 @@
     .empty-state-text {
         color: #999;
         font-size: 0.875rem;
+    }
+
+    /* ── Dark Mode ── */
+    html.dark .volunteers-title {
+        color: #e2e8f0 !important;
+    }
+
+    html.dark .search-and-filter {
+        background-color: #1a2235 !important;
+        border-color: #2a3a50 !important;
+    }
+
+    html.dark .filter-title {
+        color: #e2e8f0 !important;
+    }
+
+    html.dark .volunteers-table-container {
+        background-color: #1a2235 !important;
+    }
+
+    html.dark .volunteers-table th {
+        background-color: #1e2a3a !important;
+        color: #93c5fd !important;
+        border-color: #2a3a50 !important;
+    }
+
+    html.dark .volunteers-table td {
+        border-color: #2a3a50 !important;
+        color: #e2e8f0;
+    }
+
+    html.dark .volunteers-table tr:hover {
+        background-color: #1e2a3a !important;
+    }
+
+    html.dark .volunteer-name {
+        color: #93c5fd !important;
+    }
+
+    html.dark .volunteer-email {
+        color: #64748b !important;
+    }
+
+    html.dark .clean-time {
+        color: #e2e8f0 !important;
+    }
+
+    html.dark .status-active {
+        background-color: #14532d;
+        color: #bbf7d0;
+    }
+
+    html.dark .status-inactive {
+        background-color: #1e2a3a;
+        color: #94a3b8;
+    }
+
+    html.dark .status-pending {
+        background-color: #422006;
+        color: #fde68a;
+    }
+
+    html.dark .credential-badge {
+        background-color: #0c4a6e;
+        color: #bae6fd;
+    }
+
+    html.dark .credential-badge.pending {
+        background-color: #422006;
+        color: #fde68a;
+    }
+
+    html.dark .credential-badge.expired {
+        background-color: #450a0a;
+        color: #fecaca;
+    }
+
+    html.dark .btn-reset {
+        background-color: #2a3a50 !important;
+        color: #e2e8f0 !important;
+    }
+
+    html.dark .btn-reset:hover {
+        background-color: #3a4a60 !important;
+    }
+
+    html.dark .pagination li a,
+    html.dark .pagination li span {
+        background-color: #1a2235 !important;
+        border-color: #2a3a50 !important;
+        color: #93c5fd !important;
+    }
+
+    html.dark .pagination li a:hover {
+        background-color: #1e3a5f !important;
+        border-color: #2a4a72 !important;
+        color: #bfdbfe !important;
+    }
+
+    html.dark .pagination li.active span {
+        background-color: #1e3a5f !important;
+        border-color: #2a4a72 !important;
+        color: #bfdbfe !important;
+    }
+
+    html.dark .pagination li.disabled span {
+        color: #475569 !important;
+    }
+
+    html.dark .empty-state {
+        background-color: #1a2235 !important;
+    }
+
+    html.dark .empty-state-title {
+        color: #94a3b8 !important;
+    }
+
+    html.dark .empty-state-text {
+        color: #64748b !important;
     }
 
     @media (max-width: 1024px) {
@@ -665,15 +800,13 @@
             </div>
 
             <!-- Pagination -->
+            @if($volunteers->hasPages())
             <div class="volunteers-table-container" style="box-shadow: none; padding: 0;">
                 <div class="pagination">
-                    <button class="disabled">&laquo; Previous</button>
-                    <button class="active">1</button>
-                    <button>2</button>
-                    <button>3</button>
-                    <button>Next &raquo;</button>
+                    {{ $volunteers->links() }}
                 </div>
             </div>
+            @endif
         </div>
     </div>
 </div>

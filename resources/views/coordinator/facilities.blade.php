@@ -396,6 +396,89 @@
         margin-bottom: 1.5rem;
     }
 
+    /* ── Dark Mode ── */
+    html.dark .facilities-title {
+        color: #e2e8f0 !important;
+    }
+
+    html.dark .facility-card {
+        background-color: #1a2235 !important;
+        border-color: #2a3a50 !important;
+    }
+
+    html.dark .facility-card-body {
+        background-color: #1a2235;
+    }
+
+    html.dark .facility-info-label {
+        color: #94a3b8 !important;
+    }
+
+    html.dark .facility-info-value {
+        color: #e2e8f0 !important;
+    }
+
+    html.dark .facility-info-item {
+        border-color: #2a3a50 !important;
+    }
+
+    html.dark .facility-card-footer {
+        background-color: #141d2e !important;
+    }
+
+    html.dark .facility-modal-dialog {
+        background-color: #1a2235 !important;
+        color: #e2e8f0;
+    }
+
+    html.dark .modal-body {
+        background-color: #1a2235;
+    }
+
+    html.dark .modal-footer {
+        background-color: #141d2e !important;
+    }
+
+    html.dark .form-label {
+        color: #e2e8f0 !important;
+    }
+
+    html.dark .schedule-builder {
+        background-color: #141d2e !important;
+        border-color: #2a3a50 !important;
+    }
+
+    html.dark .meeting-slot {
+        background-color: #1a2235 !important;
+        border-color: #2a3a50 !important;
+    }
+
+    html.dark .meeting-slot-header {
+        color: #93c5fd !important;
+    }
+
+    html.dark .btn-secondary {
+        background-color: #2a3a50 !important;
+        color: #e2e8f0 !important;
+    }
+
+    html.dark .btn-secondary:hover {
+        background-color: #3a4a60 !important;
+    }
+
+    html.dark .empty-state {
+        background-color: #1a2235 !important;
+        color: #e2e8f0;
+    }
+
+    html.dark .empty-state-title {
+        color: #94a3b8 !important;
+    }
+
+    html.dark .empty-state-text {
+        color: #64748b !important;
+    }
+
     @media (max-width: 768px) {
         .facilities-header {
             flex-direction: column;

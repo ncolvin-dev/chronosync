@@ -251,6 +251,90 @@
         color: #999;
     }
 
+    /* ── Dark Mode ── */
+    html.dark .dashboard-title,
+    html.dark .dashboard-subtitle {
+        color: #e2e8f0 !important;
+    }
+
+    html.dark .schedule-table th {
+        background-color: #1e2a3a !important;
+        color: #93c5fd !important;
+        border-color: #2a3a50 !important;
+    }
+
+    html.dark .schedule-table td {
+        border-color: #2a3a50 !important;
+        color: #e2e8f0;
+    }
+
+    html.dark .schedule-table tr:hover {
+        background-color: #1e2a3a !important;
+    }
+
+    html.dark .schedule-table tr.unfilled {
+        background-color: #3b1219 !important;
+    }
+
+    html.dark .schedule-table tr.unfilled td {
+        color: #fca5a5 !important;
+    }
+
+    html.dark .schedule-table tr.unfilled:hover {
+        background-color: #4c1a24 !important;
+    }
+
+    html.dark .status-confirmed {
+        background-color: #14532d;
+        color: #bbf7d0;
+    }
+
+    html.dark .status-pending {
+        background-color: #422006;
+        color: #fde68a;
+    }
+
+    html.dark .status-unfilled {
+        background-color: #450a0a;
+        color: #fecaca;
+    }
+
+    html.dark .alerts-section {
+        background-color: #422006 !important;
+        border-color: #854d0e !important;
+    }
+
+    html.dark .alerts-title,
+    html.dark .alert-item {
+        color: #fde68a !important;
+    }
+
+    html.dark .activity-icon {
+        background-color: #1e2a3a !important;
+    }
+
+    html.dark .activity-action {
+        color: #e2e8f0 !important;
+    }
+
+    html.dark .section-card .section-title {
+        border-color: #2a3a50 !important;
+    }
+
+    html.dark .activity-item {
+        border-color: #2a3a50 !important;
+    }
+
+    html.dark .btn-action {
+        background-color: #1e3a5f !important;
+        color: #93c5fd !important;
+    }
+
+    html.dark .btn-action:hover {
+        background-color: #2a4a72 !important;
+        color: #bfdbfe !important;
+    }
+
     @media (max-width: 1200px) {
         .dashboard-content {
             grid-template-columns: 1fr;
