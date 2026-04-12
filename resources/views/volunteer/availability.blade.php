@@ -93,7 +93,7 @@
     }
 
     .grid-cell-time {
-        padding: 1rem;
+        padding: 0.5rem;
         background-color: #f8f9fa;
         font-weight: 600;
         color: #333;
@@ -103,6 +103,53 @@
         display: flex;
         align-items: center;
         justify-content: center;
+        gap: 0.4rem;
+    }
+
+    .btn-select-row {
+        width: 22px;
+        height: 22px;
+        border-radius: 4px;
+        border: 2px solid #0099cc;
+        background: white;
+        color: #0099cc;
+        font-size: 0.6rem;
+        font-weight: 700;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+        transition: all 0.2s;
+        padding: 0;
+        line-height: 1;
+        position: relative;
+    }
+
+    .btn-select-row:hover {
+        background-color: #e6f7fc;
+    }
+
+    .btn-select-row.all-selected {
+        background-color: #0099cc;
+        color: white;
+    }
+
+    .btn-select-row[title]:hover::after {
+        content: "Select all";
+        position: absolute;
+        left: 26px;
+        top: 50%;
+        transform: translateY(-50%);
+        background: #003366;
+        color: white;
+        font-size: 0.7rem;
+        font-weight: 600;
+        padding: 0.2rem 0.45rem;
+        border-radius: 4px;
+        white-space: nowrap;
+        z-index: 10;
+        pointer-events: none;
     }
 
     .grid-cell {
@@ -345,7 +392,14 @@
                                         $timeLabel = date('g A', strtotime("$hour:00"));
                                     @endphp
                                     <div class="grid-row">
-                                        <div class="grid-cell-time">{{ $timeLabel }}</div>
+                                        <div class="grid-cell-time">
+                                            <button type="button"
+                                                class="btn-select-row"
+                                                title="Select all"
+                                                onclick="toggleRow({{ $week }}, {{ $hour }}, this)">
+                                            </button>
+                                            {{ $timeLabel }}
+                                        </div>
                                         @for($day = 0; $day < 7; $day++)
                                             @php
                                                 $cellId = "availability_week{$week}_day{$day}_hour{$hour}";
@@ -427,6 +481,32 @@
             element.classList.remove('unavailable');
             indicator.classList.add('available');
         }
+    }
+
+    // Toggle all days for a given hour row
+    function toggleRow(week, hour, btn) {
+        const cells = document.querySelectorAll(
+            `#week-${week} .grid-cell[data-week="${week}"][data-hour="${hour}"]`
+        );
+        const allChecked = [...cells].every(c => c.querySelector('.availability-input').value === '1');
+
+        cells.forEach(cell => {
+            const input = cell.querySelector('.availability-input');
+            const indicator = cell.querySelector('.availability-indicator');
+            if (allChecked) {
+                input.value = '0';
+                cell.classList.remove('available');
+                cell.classList.add('unavailable');
+                indicator.classList.remove('available');
+            } else {
+                input.value = '1';
+                cell.classList.add('available');
+                cell.classList.remove('unavailable');
+                indicator.classList.add('available');
+            }
+        });
+
+        btn.classList.toggle('all-selected', !allChecked);
     }
 
     // Reset availability
