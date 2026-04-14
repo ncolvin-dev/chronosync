@@ -4,6 +4,8 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\StoreVolunteerRequest;
 use App\Models\Volunteer;
+use App\Models\VolunteerCredential;
+use App\Models\CredentialType;
 use App\Models\User;
 use App\Models\Facility;
 use App\Models\AuditLog;
@@ -22,31 +24,41 @@ class VolunteerController extends Controller
 
         $query = Volunteer::withoutTrashed();
 
-        // Filter by facility
-        if ($request->filled('facility_id')) {
-            $query->where('treatment_facility_id', $request->facility_id);
-        }
-
-        // Filter by status
-        if ($request->filled('status')) {
-            if ($request->status === 'active') {
-                $query->where('is_active', true);
-            } elseif ($request->status === 'inactive') {
-                $query->where('is_active', false);
-            }
-        }
-
         // Search by name or email
         if ($request->filled('search')) {
             $search = '%' . $request->search . '%';
-            $query->whereHas('user', function ($q) use ($search) {
+            $query->where(function ($q) use ($search) {
                 $q->where('email', 'like', $search)
                   ->orWhere('first_name', 'like', $search)
                   ->orWhere('last_name', 'like', $search);
             });
         }
 
-        $volunteers = $query->paginate(15);
+        // Filter by probation/status
+        if ($request->filled('status')) {
+            if ($request->status === 'probation') {
+                $query->where('probation_status', 'active_probation');
+            } elseif ($request->status === 'active') {
+                $query->where('probation_status', 'not_probation');
+            }
+        }
+
+        // Filter by clean time (years)
+        if ($request->filled('clean_time')) {
+            [$min, $max] = match($request->clean_time) {
+                '0-1'  => [0, 1],
+                '1-2'  => [1, 2],
+                '2-5'  => [2, 5],
+                '5+'   => [5, 999],
+                default => [0, 999],
+            };
+            $query->whereBetween('clean_date', [
+                now()->subYears($max)->toDateString(),
+                now()->subYears($min)->toDateString(),
+            ]);
+        }
+
+        $volunteers = $query->with(['credentials.credentialType'])->paginate(15);
 
         return view('coordinator.volunteers', compact('volunteers'));
     }
@@ -133,21 +145,124 @@ class VolunteerController extends Controller
     {
         $this->authorizeView($volunteer);
 
-        return view('volunteer.profile', compact('volunteer'));
+        $volunteer->load('credentials.credentialType');
+
+        // Coordinators/admins see a read-only version of the profile
+        $user  = auth()->user();
+        $roles = is_array($user->roles) ? $user->roles : json_decode($user->roles, true) ?? [];
+        $isCoordinator = in_array('coordinator', $roles) || in_array('admin', $roles);
+        $readOnly = $isCoordinator && $user->email !== $volunteer->email;
+
+        return view('volunteer.profile', compact('volunteer', 'readOnly'));
     }
 
     /**
-     * Show edit form.
+     * Show coordinator edit form.
      */
     public function edit(Volunteer $volunteer)
     {
-        $this->authorizeEdit($volunteer);
+        $this->authorizeCoordinatorOrAdmin();
 
-        $facilities = Facility::where('status', 'active')
-            ->orderBy('facility_name')
-            ->get();
+        $volunteer->load(['credentials.credentialType', 'credentials.facility']);
+        $facilities = Facility::orderBy('facility_name')->get();
+        $credentialTypes = CredentialType::orderBy('name')->get();
 
-        return view('placeholder.coming-soon', compact('volunteer', 'facilities'));
+        return view('coordinator.volunteer-edit', compact('volunteer', 'facilities', 'credentialTypes'));
+    }
+
+    /**
+     * Coordinator update of volunteer info.
+     */
+    public function coordinatorUpdate(Request $request, Volunteer $volunteer)
+    {
+        $this->authorizeCoordinatorOrAdmin();
+
+        $validated = $request->validate([
+            'first_name'        => 'required|string|max:100',
+            'last_name'         => 'required|string|max:100',
+            'email'             => 'required|email|unique:volunteers,email,' . $volunteer->volunteer_id . ',volunteer_id',
+            'phone'             => 'required|string|max:30',
+            'dob'               => 'required|date|before_or_equal:today',
+            'gender'            => 'required|string|max:50',
+            'clean_date'        => 'required|date|before_or_equal:today',
+            'probation_status'  => 'required|in:not_probation,active_probation',
+            'treatment_facility'=> 'nullable|string|max:255',
+            'facility_name'     => 'nullable|string|max:255',
+            'discharge_date'    => 'nullable|date',
+            'neighborhood'      => 'nullable|string|max:255',
+            'bus_line'          => 'nullable|string|max:100',
+            'is_sms_deliverable'=> 'boolean',
+        ]);
+
+        $volunteer->fill($validated)->save();
+
+        AuditLog::create([
+            'actor_user_id'  => auth()->id(),
+            'action'         => 'coordinator_update_volunteer',
+            'entity_type'    => 'volunteers',
+            'entity_id'      => $volunteer->volunteer_id,
+            'change_details' => $validated,
+        ]);
+
+        return redirect()->route('volunteers.edit', $volunteer)
+            ->with('success', 'Volunteer updated successfully.');
+    }
+
+    /**
+     * Add a credential to a volunteer.
+     */
+    public function storeCredential(Request $request, Volunteer $volunteer)
+    {
+        $this->authorizeCoordinatorOrAdmin();
+
+        $validated = $request->validate([
+            'facility_id'        => 'required|exists:facilities,facility_id',
+            'credential_type_id' => 'required|exists:credential_types,credential_type_id',
+            'status'             => 'required|in:pending,approved,denied',
+            'approval_date'      => 'nullable|date',
+            'expiration_date'    => 'nullable|date',
+            'notes'              => 'nullable|string|max:500',
+        ]);
+
+        $validated['volunteer_id'] = $volunteer->volunteer_id;
+
+        VolunteerCredential::create($validated);
+
+        return redirect()->route('volunteers.edit', $volunteer)
+            ->with('success', 'Credential added successfully.');
+    }
+
+    /**
+     * Update an existing credential.
+     */
+    public function updateCredential(Request $request, Volunteer $volunteer, VolunteerCredential $credential)
+    {
+        $this->authorizeCoordinatorOrAdmin();
+
+        $validated = $request->validate([
+            'status'          => 'required|in:pending,approved,denied',
+            'approval_date'   => 'nullable|date',
+            'expiration_date' => 'nullable|date',
+            'notes'           => 'nullable|string|max:500',
+        ]);
+
+        $credential->fill($validated)->save();
+
+        return redirect()->route('volunteers.edit', $volunteer)
+            ->with('success', 'Credential updated successfully.');
+    }
+
+    /**
+     * Delete a credential.
+     */
+    public function destroyCredential(Volunteer $volunteer, VolunteerCredential $credential)
+    {
+        $this->authorizeCoordinatorOrAdmin();
+
+        $credential->delete();
+
+        return redirect()->route('volunteers.edit', $volunteer)
+            ->with('success', 'Credential removed.');
     }
 
     /**

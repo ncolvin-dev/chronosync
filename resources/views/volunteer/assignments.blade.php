@@ -281,6 +281,120 @@
         display: block;
     }
 
+    /* ── Dark Mode ── */
+    html.dark .assignments-title {
+        color: #93c5fd;
+    }
+
+    html.dark .assignments-subtitle {
+        color: #94a3b8;
+    }
+
+    html.dark .filter-tabs {
+        border-bottom-color: #2a3a50;
+    }
+
+    html.dark .filter-tab {
+        color: #64748b;
+    }
+
+    html.dark .filter-tab:hover {
+        color: #cbd5e1;
+    }
+
+    html.dark .filter-tab.active {
+        color: #38bdf8;
+        border-bottom-color: #38bdf8;
+    }
+
+    html.dark .assignment-card {
+        background-color: #1a2235;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.4);
+        border-left-color: #2a3a50;
+    }
+
+    html.dark .assignment-card.confirmed {
+        border-left-color: #28a745;
+    }
+
+    html.dark .assignment-card.pending {
+        border-left-color: #d97706;
+    }
+
+    html.dark .assignment-card.scheduled {
+        border-left-color: #0099cc;
+    }
+
+    html.dark .assignment-facility {
+        color: #93c5fd;
+    }
+
+    /* Status badges */
+    html.dark .assignment-status.confirmed {
+        background-color: #14532d;
+        color: #bbf7d0;
+    }
+
+    html.dark .assignment-status.pending {
+        background-color: #78350f;
+        color: #fde68a;
+    }
+
+    html.dark .assignment-status.scheduled {
+        background-color: #164e63;
+        color: #a5f3fc;
+    }
+
+    html.dark .assignment-detail-label {
+        color: #64748b;
+    }
+
+    html.dark .assignment-detail-value {
+        color: #e2e8f0;
+    }
+
+    html.dark .assignment-location {
+        background-color: #141d2e;
+        border-left-color: #0099cc;
+    }
+
+    html.dark .assignment-location-title {
+        color: #93c5fd;
+    }
+
+    html.dark .assignment-location-address {
+        color: #94a3b8;
+    }
+
+    html.dark .sms-reminder {
+        background-color: #0f2235;
+        border-color: #0099cc;
+    }
+
+    html.dark .sms-reminder-title {
+        color: #93c5fd;
+    }
+
+    html.dark .sms-reminder-text {
+        color: #94a3b8;
+    }
+
+    html.dark .empty-state-title {
+        color: #94a3b8;
+    }
+
+    html.dark .empty-state-text {
+        color: #64748b;
+    }
+
+    html.dark .empty-state-icon {
+        color: #2a3a50;
+    }
+
+    html.dark .tab-content > p {
+        color: #94a3b8 !important;
+    }
+
     @media (max-width: 768px) {
         .assignments-title {
             font-size: 1.25rem;

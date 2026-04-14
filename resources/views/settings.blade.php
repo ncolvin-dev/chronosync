@@ -175,8 +175,68 @@
         border-radius: 0.5rem;
         font-weight: 600;
         font-size: 0.875rem;
-        cursor: not-allowed;
-        opacity: 0.6;
+        cursor: pointer;
+        transition: background-color 0.2s;
+    }
+
+    .btn-settings-save:hover {
+        background-color: #003366;
+    }
+
+    html.dark .settings-card-body .form-control {
+        background-color: #141d2e;
+        border-color: #2a3a50;
+        color: #e2e8f0;
+    }
+
+    html.dark .settings-card-body .form-control:focus {
+        border-color: #0099cc;
+        background-color: #141d2e;
+        color: #e2e8f0;
+    }
+
+    html.dark .settings-card-body .form-control:disabled {
+        background-color: #0f1824;
+        color: #4a5a6a;
+    }
+
+    html.dark .settings-hint {
+        color: #64748b;
+    }
+
+    .alert-settings {
+        padding: 0.75rem 1rem;
+        border-radius: 0.5rem;
+        font-size: 0.875rem;
+        font-weight: 500;
+        margin-bottom: 1rem;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .alert-settings-success {
+        background-color: #d4edda;
+        color: #155724;
+        border: 1px solid #c3e6cb;
+    }
+
+    .alert-settings-error {
+        background-color: #f8d7da;
+        color: #721c24;
+        border: 1px solid #f5c6cb;
+    }
+
+    html.dark .alert-settings-success {
+        background-color: #14532d;
+        color: #bbf7d0;
+        border-color: #166534;
+    }
+
+    html.dark .alert-settings-error {
+        background-color: #7f1d1d;
+        color: #fecaca;
+        border-color: #991b1b;
     }
 
 </style>
@@ -202,21 +262,42 @@
             </div>
         </div>
         <div class="settings-card-body">
-            <div class="mb-3">
-                <label class="settings-form-label">Current Email</label>
-                <input type="email" class="form-control" value="{{ auth()->user()->email }}" disabled>
-            </div>
-            <div class="mb-3">
-                <label class="settings-form-label">New Email</label>
-                <input type="email" class="form-control" placeholder="Enter new email address" disabled>
-            </div>
-            <div class="mb-4">
-                <label class="settings-form-label">Confirm New Email</label>
-                <input type="email" class="form-control" placeholder="Confirm new email address" disabled>
-            </div>
-            <button class="btn-settings-save" disabled>
-                <i class="fas fa-save"></i> Save Email
-            </button>
+            @if(session('email_success'))
+                <div class="alert-settings alert-settings-success">
+                    <i class="fas fa-check-circle"></i> {{ session('email_success') }}
+                </div>
+            @endif
+            @error('new_email')
+                <div class="alert-settings alert-settings-error">
+                    <i class="fas fa-exclamation-circle"></i> {{ $message }}
+                </div>
+            @enderror
+            @error('confirm_email')
+                <div class="alert-settings alert-settings-error">
+                    <i class="fas fa-exclamation-circle"></i> {{ $message }}
+                </div>
+            @enderror
+
+            <form method="POST" action="{{ route('settings.email') }}">
+                @csrf
+                <div class="mb-3">
+                    <label class="settings-form-label">Current Email</label>
+                    <input type="email" class="form-control" value="{{ auth()->user()->email }}" disabled>
+                </div>
+                <div class="mb-3">
+                    <label class="settings-form-label">New Email</label>
+                    <input type="email" class="form-control" name="new_email"
+                           placeholder="Enter new email address" value="{{ old('new_email') }}" required>
+                </div>
+                <div class="mb-4">
+                    <label class="settings-form-label">Confirm New Email</label>
+                    <input type="email" class="form-control" name="confirm_email"
+                           placeholder="Confirm new email address" required>
+                </div>
+                <button type="submit" class="btn-settings-save">
+                    <i class="fas fa-save"></i> Save Email
+                </button>
+            </form>
         </div>
     </div>
 
@@ -232,22 +313,44 @@
             </div>
         </div>
         <div class="settings-card-body">
-            <div class="mb-3">
-                <label class="settings-form-label">Current Password</label>
-                <input type="password" class="form-control" placeholder="Enter current password" disabled>
-            </div>
-            <div class="mb-3">
-                <label class="settings-form-label">New Password</label>
-                <input type="password" class="form-control" placeholder="Enter new password" disabled>
-                <p class="settings-hint">Min. 10 characters with uppercase, lowercase, number, and special character.</p>
-            </div>
-            <div class="mb-4">
-                <label class="settings-form-label">Confirm New Password</label>
-                <input type="password" class="form-control" placeholder="Confirm new password" disabled>
-            </div>
-            <button class="btn-settings-save" disabled>
-                <i class="fas fa-save"></i> Save Password
-            </button>
+            @if(session('password_success'))
+                <div class="alert-settings alert-settings-success">
+                    <i class="fas fa-check-circle"></i> {{ session('password_success') }}
+                </div>
+            @endif
+            @error('current_password')
+                <div class="alert-settings alert-settings-error">
+                    <i class="fas fa-exclamation-circle"></i> {{ $message }}
+                </div>
+            @enderror
+            @error('new_password')
+                <div class="alert-settings alert-settings-error">
+                    <i class="fas fa-exclamation-circle"></i> {{ $message }}
+                </div>
+            @enderror
+
+            <form method="POST" action="{{ route('settings.password') }}">
+                @csrf
+                <div class="mb-3">
+                    <label class="settings-form-label">Current Password</label>
+                    <input type="password" class="form-control" name="current_password"
+                           placeholder="Enter current password" required>
+                </div>
+                <div class="mb-3">
+                    <label class="settings-form-label">New Password</label>
+                    <input type="password" class="form-control" name="new_password"
+                           placeholder="Enter new password" required>
+                    <p class="settings-hint">Min. 10 characters.</p>
+                </div>
+                <div class="mb-4">
+                    <label class="settings-form-label">Confirm New Password</label>
+                    <input type="password" class="form-control" name="new_password_confirmation"
+                           placeholder="Confirm new password" required>
+                </div>
+                <button type="submit" class="btn-settings-save">
+                    <i class="fas fa-save"></i> Save Password
+                </button>
+            </form>
         </div>
     </div>
 

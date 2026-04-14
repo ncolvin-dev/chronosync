@@ -34,10 +34,11 @@ class VolunteerCredential extends Model
     protected $fillable = [
         'volunteer_id',
         'facility_id',
-        'credential_type',
+        'credential_type_id',
         'status',
         'approval_date',
         'expiration_date',
+        'notes',
     ];
 
     protected $casts = [
@@ -225,6 +226,16 @@ class VolunteerCredential extends Model
     }
 
     /**
+     * Relationship: Credential type.
+     *
+     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
+     */
+    public function credentialType()
+    {
+        return $this->belongsTo(CredentialType::class, 'credential_type_id', 'credential_type_id');
+    }
+
+    /**
      * Relationship: Volunteer.
      *
      * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
@@ -242,5 +253,13 @@ class VolunteerCredential extends Model
     public function facility()
     {
         return $this->belongsTo(Facility::class, 'facility_id', 'facility_id');
+    }
+
+    /**
+     * Relationship: CredentialType (alias for credentialType, matches HasUlids convention).
+     */
+    public function type()
+    {
+        return $this->credentialType();
     }
 }
