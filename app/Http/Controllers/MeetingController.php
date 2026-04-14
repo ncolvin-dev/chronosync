@@ -78,7 +78,12 @@ class MeetingController extends Controller
             ->orderBy('facility_name')
             ->get();
 
-        return view('coordinator.matching', compact('meetings', 'facilities'));
+        $volunteers = Volunteer::withoutTrashed()
+            ->orderBy('last_name')
+            ->orderBy('first_name')
+            ->get(['volunteer_id', 'first_name', 'last_name']);
+
+        return view('coordinator.matching', compact('meetings', 'facilities', 'volunteers'));
     }
 
     /**

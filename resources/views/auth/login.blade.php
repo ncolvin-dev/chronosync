@@ -135,6 +135,65 @@
         margin-top: 0.5rem;
     }
 
+    /* ── Dark Mode ── */
+    html.dark .login-container {
+        background: linear-gradient(135deg, #0a1628 0%, #0c3a5c 100%);
+    }
+
+    html.dark .login-card {
+        background-color: #1a2235;
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+    }
+
+    html.dark .login-logo {
+        color: #38bdf8;
+    }
+
+    html.dark .login-title {
+        color: #e2e8f0;
+    }
+
+    html.dark .login-subtitle {
+        color: #94a3b8;
+    }
+
+    html.dark .form-label {
+        color: #cbd5e1;
+    }
+
+    html.dark .form-control {
+        background-color: #141d2e;
+        border-color: #2a3a50;
+        color: #e2e8f0;
+    }
+
+    html.dark .form-control::placeholder {
+        color: #4a5a6a;
+    }
+
+    html.dark .form-control:focus {
+        background-color: #141d2e;
+        border-color: #0099cc;
+        color: #e2e8f0;
+    }
+
+    html.dark .form-check-label {
+        color: #94a3b8;
+    }
+
+    html.dark .form-check-input {
+        background-color: #141d2e;
+        border-color: #2a3a50;
+    }
+
+    html.dark .signup-section {
+        border-top-color: #2a3a50;
+    }
+
+    html.dark .signup-text {
+        color: #94a3b8;
+    }
+
     @media (max-width: 576px) {
         .login-card {
             margin: 1rem;
