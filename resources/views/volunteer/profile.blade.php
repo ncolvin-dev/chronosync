@@ -256,6 +256,93 @@
         color: white;
     }
 
+    /* ── Dark Mode ── */
+    html.dark .collapsible-header {
+        background-color: #1a2235;
+        border-color: #2a3a50;
+    }
+
+    html.dark .collapsible-header:hover {
+        background-color: #223044;
+    }
+
+    html.dark .collapsible-header-title {
+        color: #93c5fd;
+    }
+
+    html.dark .collapsible-content {
+        background-color: #141d2e;
+        border-color: #2a3a50;
+    }
+
+    html.dark .info-label {
+        color: #64748b;
+    }
+
+    html.dark .info-value {
+        color: #e2e8f0;
+    }
+
+    html.dark .info-item {
+        border-bottom-color: #2a3a50;
+    }
+
+    html.dark .form-label {
+        color: #cbd5e1;
+    }
+
+    html.dark .form-control,
+    html.dark .form-select {
+        background-color: #1a2235;
+        border-color: #2a3a50;
+        color: #e2e8f0;
+    }
+
+    html.dark .btn-secondary {
+        background-color: #2a3a50;
+        color: #cbd5e1;
+    }
+
+    html.dark .btn-secondary:hover {
+        background-color: #3a4a60;
+    }
+
+    html.dark .edit-button-inline {
+        border-color: #38bdf8;
+        color: #38bdf8;
+    }
+
+    html.dark .edit-button-inline:hover {
+        background-color: #38bdf8;
+        color: #0f172a;
+    }
+
+    html.dark .audit-trail {
+        background-color: #1a2235;
+        border-left-color: #0099cc;
+    }
+
+    html.dark .audit-trail > div {
+        color: #e2e8f0 !important;
+    }
+
+    html.dark .audit-date {
+        color: #93c5fd !important;
+    }
+
+    html.dark .audit-item {
+        color: #94a3b8 !important;
+    }
+
+    /* Credentials read-only rows in dark mode */
+    html.dark .collapsible-content [style*="border-bottom: 1px solid #e0e0e0"] {
+        border-bottom-color: #2a3a50 !important;
+    }
+
+    html.dark .availability-subtitle {
+        color: #94a3b8;
+    }
+
     @media (max-width: 768px) {
         .profile-header {
             padding: 2rem 1rem;
@@ -281,6 +368,18 @@
 <div class="container-md">
     <div class="row">
         <div class="col-12">
+            @if($readOnly ?? false)
+            <div style="margin-bottom: 1rem; display: flex; gap: 0.75rem; align-items: center;">
+                <a href="{{ route('volunteers.index') }}" style="color: #0099cc; font-size: 0.9rem; text-decoration: none; font-weight: 600;">
+                    <i class="fas fa-arrow-left"></i> Back to Volunteers
+                </a>
+                <a href="{{ route('volunteers.edit', $volunteer->volunteer_id) }}"
+                   style="margin-left: auto; padding: 0.5rem 1rem; background: #003366; color: white; border-radius: 0.5rem; font-size: 0.85rem; font-weight: 600; text-decoration: none;">
+                    <i class="fas fa-edit"></i> Edit Volunteer
+                </a>
+            </div>
+            @endif
+
             <!-- Profile Header -->
             <div class="profile-header">
                 <div class="profile-avatar">
@@ -351,9 +450,11 @@
                                 <div class="info-value">{{ \Carbon\Carbon::parse($volunteer->clean_date)->format('M d, Y') }}</div>
                             </div>
                         </div>
+                        @unless($readOnly ?? false)
                         <button class="edit-button-inline" data-edit-section="personal-info">
                             <i class="fas fa-edit"></i> Edit
                         </button>
+                        @endunless
                     </div>
 
                     <form method="POST" action="{{ route('volunteer.profile.update') }}" class="edit-form" id="personal-info-form" novalidate>
@@ -434,9 +535,11 @@
                                 <div class="info-value">{{ $volunteer->bus_line ?? 'Not provided' }}</div>
                             </div>
                         </div>
+                        @unless($readOnly ?? false)
                         <button class="edit-button-inline" data-edit-section="transportation">
                             <i class="fas fa-edit"></i> Edit
                         </button>
+                        @endunless
                     </div>
 
                     <form method="POST" action="{{ route('volunteer.profile.update') }}" class="edit-form" id="transportation-form" novalidate>
@@ -501,9 +604,11 @@
                                 </div>
                             </div>
                         </div>
+                        @unless($readOnly ?? false)
                         <button class="edit-button-inline" data-edit-section="facility-probation">
                             <i class="fas fa-edit"></i> Edit
                         </button>
+                        @endunless
                     </div>
 
                     <form method="POST" action="{{ route('volunteer.profile.update') }}" class="edit-form" id="facility-probation-form" novalidate>
@@ -554,6 +659,42 @@
                     </form>
                 </div>
             </div>
+
+            <!-- Credentials Section (coordinator read-only view) -->
+            @if($readOnly ?? false)
+            <div class="collapsible-section">
+                <div class="collapsible-header collapsed" data-target="credentials-section">
+                    <div class="collapsible-header-title">
+                        <i class="fas fa-id-card"></i> Credentials
+                    </div>
+                    <i class="fas fa-chevron-down collapsible-header-icon"></i>
+                </div>
+                <div class="collapsible-content" id="credentials-section">
+                    @forelse($volunteer->credentials as $cred)
+                    <div style="display: flex; gap: 2rem; padding: 1rem 0; border-bottom: 1px solid #e0e0e0; flex-wrap: wrap;">
+                        <div style="min-width: 160px;">
+                            <div class="info-label">Type</div>
+                            <div class="info-value">{{ $cred->credentialType?->name ?? '—' }}</div>
+                        </div>
+                        <div style="min-width: 100px;">
+                            <div class="info-label">Status</div>
+                            <div class="info-value">{{ ucfirst($cred->status) }}</div>
+                        </div>
+                        <div style="min-width: 140px;">
+                            <div class="info-label">Approval Date</div>
+                            <div class="info-value">{{ $cred->approval_date ? \Carbon\Carbon::parse($cred->approval_date)->format('M d, Y') : '—' }}</div>
+                        </div>
+                        <div style="min-width: 140px;">
+                            <div class="info-label">Expiration Date</div>
+                            <div class="info-value">{{ $cred->expiration_date ? \Carbon\Carbon::parse($cred->expiration_date)->format('M d, Y') : '—' }}</div>
+                        </div>
+                    </div>
+                    @empty
+                    <p style="color: #999; font-size: 0.9rem; margin: 0;">No credentials on file.</p>
+                    @endforelse
+                </div>
+            </div>
+            @endif
 
             <!-- Audit Trail -->
             <div class="audit-trail">

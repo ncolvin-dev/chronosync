@@ -289,6 +289,113 @@
         100% { transform: rotate(360deg); }
     }
 
+    /* ── Dark Mode ── */
+    html.dark .availability-title {
+        color: #93c5fd;
+    }
+
+    html.dark .availability-subtitle {
+        color: #94a3b8;
+    }
+
+    html.dark .legend-text {
+        color: #94a3b8;
+    }
+
+    html.dark .legend-box.unavailable {
+        background-color: #2a3a50;
+        border: 1px solid #3a4a60;
+    }
+
+    html.dark .tab-button {
+        background-color: #1a2235;
+        color: #94a3b8;
+        border: 1px solid #2a3a50;
+    }
+
+    html.dark .tab-button:hover {
+        background-color: #223044;
+        color: #cbd5e1;
+    }
+
+    html.dark .tab-button.active {
+        background-color: #0099cc;
+        color: white;
+        border-color: #0099cc;
+    }
+
+    html.dark .availability-grid {
+        background-color: #1a2235;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.4);
+    }
+
+    html.dark .grid-header {
+        background-color: #141d2e;
+        border-bottom-color: #2a3a50;
+    }
+
+    html.dark .grid-header-cell {
+        color: #93c5fd;
+        border-right-color: #2a3a50;
+    }
+
+    html.dark .grid-row {
+        border-bottom-color: #2a3a50;
+    }
+
+    html.dark .grid-cell-time {
+        background-color: #141d2e;
+        color: #cbd5e1;
+        border-right-color: #2a3a50;
+    }
+
+    html.dark .grid-cell {
+        border-right-color: #2a3a50;
+        background-color: #1a2235;
+    }
+
+    html.dark .grid-cell:hover {
+        background-color: #1e2d42;
+    }
+
+    html.dark .grid-cell.unavailable .availability-indicator {
+        background-color: #2a3a50;
+    }
+
+    html.dark .btn-select-row {
+        border-color: #38bdf8;
+        background-color: #141d2e;
+        color: #38bdf8;
+    }
+
+    html.dark .btn-select-row:hover {
+        background-color: #1e3a50;
+    }
+
+    html.dark .btn-select-row.all-selected {
+        background-color: #0099cc;
+        color: white;
+        border-color: #0099cc;
+    }
+
+    html.dark .btn-reset {
+        background-color: #2a3a50;
+        color: #cbd5e1;
+    }
+
+    html.dark .btn-reset:hover {
+        background-color: #3a4a60;
+    }
+
+    html.dark #loadingSpinner p {
+        color: #94a3b8;
+    }
+
+    html.dark .spinner {
+        border-color: #2a3a50;
+        border-top-color: #0099cc;
+    }
+
     @media (max-width: 768px) {
         .availability-title {
             font-size: 1.25rem;

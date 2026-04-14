@@ -479,6 +479,22 @@
         color: #64748b !important;
     }
 
+    html.dark .filter-section {
+        background-color: #1a2235 !important;
+        border-color: #2a3a50 !important;
+    }
+
+    html.dark .form-label {
+        color: #e2e8f0 !important;
+    }
+
+    html.dark .form-control,
+    html.dark .form-select {
+        background-color: #141d2e !important;
+        border-color: #2a3a50 !important;
+        color: #e2e8f0 !important;
+    }
+
     @media (max-width: 768px) {
         .facilities-header {
             flex-direction: column;
@@ -518,110 +534,135 @@
                 </button>
             </div>
 
+            {{-- Flash messages --}}
+            @if(session('success'))
+                <div style="background:#d4edda;color:#155724;border-radius:0.5rem;padding:0.875rem 1.25rem;margin-bottom:1.5rem;font-weight:500;">
+                    <i class="fas fa-check-circle"></i> {{ session('success') }}
+                </div>
+            @endif
+            @if(session('error'))
+                <div style="background:#f8d7da;color:#721c24;border-radius:0.5rem;padding:0.875rem 1.25rem;margin-bottom:1.5rem;font-weight:500;">
+                    <i class="fas fa-exclamation-circle"></i> {{ session('error') }}
+                </div>
+            @endif
+
+            {{-- Filter Form --}}
+            <form method="GET" action="{{ route('facilities.index') }}" style="margin-bottom:2rem;">
+                <div class="filter-section" style="background:white;border-radius:0.75rem;padding:1.25rem 1.5rem;box-shadow:0 1px 3px rgba(0,0,0,0.1);">
+                    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:1rem;margin-bottom:1rem;">
+                        <div>
+                            <label class="form-label" style="font-weight:600;color:#333;font-size:0.875rem;display:block;margin-bottom:0.4rem;">Search</label>
+                            <input type="text" class="form-control" name="search" value="{{ request('search') }}"
+                                   placeholder="Name, city, or address…">
+                        </div>
+                        <div>
+                            <label class="form-label" style="font-weight:600;color:#333;font-size:0.875rem;display:block;margin-bottom:0.4rem;">Status</label>
+                            <select class="form-select" name="status">
+                                <option value="">All Statuses</option>
+                                <option value="active"   {{ request('status') === 'active'   ? 'selected' : '' }}>Active</option>
+                                <option value="inactive" {{ request('status') === 'inactive' ? 'selected' : '' }}>Inactive</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div style="display:flex;gap:1rem;flex-wrap:wrap;">
+                        <button type="submit" style="padding:0.65rem 1.4rem;background:#0099cc;color:white;border:none;border-radius:0.5rem;font-weight:600;cursor:pointer;">
+                            <i class="fas fa-filter"></i> Apply Filters
+                        </button>
+                        <a href="{{ route('facilities.index') }}" style="padding:0.65rem 1.4rem;background:#e0e0e0;color:#333;border-radius:0.5rem;font-weight:600;text-decoration:none;display:inline-block;">
+                            <i class="fas fa-redo"></i> Reset
+                        </a>
+                    </div>
+                </div>
+            </form>
+
             <!-- Facilities Grid -->
             <div class="facilities-grid">
-                <!-- Facility Card 1 -->
+                @forelse($facilities as $facility)
+                @php
+                    $meetingCount = $facility->meetings()->where('status','active')->count();
+                    $cleanYears   = $facility->clean_time_requirement ?? 0;
+                    $cleanLabel   = $cleanYears == 0
+                        ? 'No requirement'
+                        : ($cleanYears == 1 ? '1 year minimum' : "{$cleanYears} years minimum");
+                @endphp
                 <div class="facility-card">
                     <div class="facility-card-header">
-                        <div class="facility-name">Harmony House Treatment Center</div>
-                        <span class="facility-status"><i class="fas fa-check-circle"></i> Active</span>
+                        <div class="facility-name">{{ $facility->facility_name }}</div>
+                        <span class="facility-status">
+                            @if($facility->status === 'active')
+                                <i class="fas fa-check-circle"></i> Active
+                            @else
+                                <i class="fas fa-times-circle"></i> Inactive
+                            @endif
+                        </span>
                     </div>
                     <div class="facility-card-body">
                         <div class="facility-info-item">
                             <div class="facility-info-label">Address</div>
-                            <div class="facility-info-value">123 Recovery Lane, Downtown, Metro City 12345</div>
+                            <div class="facility-info-value">{{ $facility->full_address }}</div>
                         </div>
+                        @if($facility->contact1_name)
                         <div class="facility-info-item">
                             <div class="facility-info-label">Primary Contact</div>
-                            <div class="facility-info-value">Sarah Mitchell | (555) 123-4567</div>
+                            <div class="facility-info-value">
+                                {{ $facility->contact1_name }}
+                                @if($facility->contact1_phone)| {{ $facility->contact1_phone }}@endif
+                            </div>
                         </div>
+                        @endif
                         <div class="facility-info-item">
                             <div class="facility-info-label">Clean Time Requirement</div>
-                            <div class="facility-info-value">2 years minimum</div>
+                            <div class="facility-info-value">{{ $cleanLabel }}</div>
                         </div>
                         <div class="facility-info-item">
-                            <div class="facility-info-label">Meetings This Month</div>
-                            <div class="facility-info-value">8 scheduled</div>
+                            <div class="facility-info-label">Active Meeting Slots</div>
+                            <div class="facility-info-value">{{ $meetingCount }} recurring {{ Str::plural('slot', $meetingCount) }}</div>
                         </div>
                     </div>
                     <div class="facility-card-footer">
-                        <button class="btn-small btn-edit" onclick="openEditFacilityModal(1)">
-                            <i class="fas fa-edit"></i> Edit
-                        </button>
-                        <button class="btn-small btn-delete" onclick="confirmDelete()">
-                            <i class="fas fa-trash"></i> Delete
-                        </button>
+                        {{-- Toggle active/inactive --}}
+                        <form method="POST" action="{{ route('facilities.toggle-status', $facility) }}" style="flex:1;">
+                            @csrf
+                            @method('PATCH')
+                            <button type="submit" class="btn-small"
+                                    style="width:100%;background:{{ $facility->status === 'active' ? '#6c757d' : '#28a745' }};color:white;"
+                                    title="{{ $facility->status === 'active' ? 'Deactivate' : 'Activate' }}">
+                                <i class="fas fa-{{ $facility->status === 'active' ? 'pause' : 'play' }}-circle"></i>
+                                {{ $facility->status === 'active' ? 'Deactivate' : 'Activate' }}
+                            </button>
+                        </form>
+                        {{-- Delete --}}
+                        <form method="POST" action="{{ route('facilities.destroy', $facility) }}" style="flex:1;"
+                              onsubmit="return confirm('Delete {{ addslashes($facility->facility_name) }}? This will also remove all its meeting slots.');">
+                            @csrf
+                            @method('DELETE')
+                            <button type="submit" class="btn-small btn-delete" style="width:100%;">
+                                <i class="fas fa-trash"></i> Delete
+                            </button>
+                        </form>
                     </div>
                 </div>
-
-                <!-- Facility Card 2 -->
-                <div class="facility-card">
-                    <div class="facility-card-header">
-                        <div class="facility-name">New Path Recovery Center</div>
-                        <span class="facility-status"><i class="fas fa-check-circle"></i> Active</span>
-                    </div>
-                    <div class="facility-card-body">
-                        <div class="facility-info-item">
-                            <div class="facility-info-label">Address</div>
-                            <div class="facility-info-value">456 Hope Street, Eastside, Metro City 12346</div>
-                        </div>
-                        <div class="facility-info-item">
-                            <div class="facility-info-label">Primary Contact</div>
-                            <div class="facility-info-value">Michael Chen | (555) 234-5678</div>
-                        </div>
-                        <div class="facility-info-item">
-                            <div class="facility-info-label">Clean Time Requirement</div>
-                            <div class="facility-info-value">1 year minimum</div>
-                        </div>
-                        <div class="facility-info-item">
-                            <div class="facility-info-label">Meetings This Month</div>
-                            <div class="facility-info-value">6 scheduled</div>
-                        </div>
-                    </div>
-                    <div class="facility-card-footer">
-                        <button class="btn-small btn-edit" onclick="openEditFacilityModal(2)">
-                            <i class="fas fa-edit"></i> Edit
-                        </button>
-                        <button class="btn-small btn-delete" onclick="confirmDelete()">
-                            <i class="fas fa-trash"></i> Delete
-                        </button>
+                @empty
+                <div class="empty-state" style="grid-column:1/-1;">
+                    <div class="empty-state-icon"><i class="fas fa-building"></i></div>
+                    <div class="empty-state-title">No facilities found</div>
+                    <div class="empty-state-text">
+                        @if(request()->hasAny(['search','status']))
+                            Try adjusting your filters or <a href="{{ route('facilities.index') }}">reset</a>.
+                        @else
+                            Add the first facility using the button above.
+                        @endif
                     </div>
                 </div>
-
-                <!-- Facility Card 3 -->
-                <div class="facility-card">
-                    <div class="facility-card-header">
-                        <div class="facility-name">Sunrise Community Center</div>
-                        <span class="facility-status"><i class="fas fa-check-circle"></i> Active</span>
-                    </div>
-                    <div class="facility-card-body">
-                        <div class="facility-info-item">
-                            <div class="facility-info-label">Address</div>
-                            <div class="facility-info-value">789 Main Avenue, Midtown, Metro City 12347</div>
-                        </div>
-                        <div class="facility-info-item">
-                            <div class="facility-info-label">Primary Contact</div>
-                            <div class="facility-info-label">Jennifer Lopez | (555) 345-6789</div>
-                        </div>
-                        <div class="facility-info-item">
-                            <div class="facility-info-label">Clean Time Requirement</div>
-                            <div class="facility-info-value">6 months minimum</div>
-                        </div>
-                        <div class="facility-info-item">
-                            <div class="facility-info-label">Meetings This Month</div>
-                            <div class="facility-info-value">5 scheduled</div>
-                        </div>
-                    </div>
-                    <div class="facility-card-footer">
-                        <button class="btn-small btn-edit" onclick="openEditFacilityModal(3)">
-                            <i class="fas fa-edit"></i> Edit
-                        </button>
-                        <button class="btn-small btn-delete" onclick="confirmDelete()">
-                            <i class="fas fa-trash"></i> Delete
-                        </button>
-                    </div>
-                </div>
+                @endforelse
             </div>
+
+            {{-- Pagination --}}
+            @if($facilities->hasPages())
+            <div style="display:flex;justify-content:center;margin-top:1.5rem;">
+                {{ $facilities->appends(request()->query())->links() }}
+            </div>
+            @endif
         </div>
     </div>
 </div>
@@ -643,7 +684,7 @@
 
                 <div class="form-group">
                     <label for="name" class="form-label">Facility Name *</label>
-                    <input type="text" class="form-control" id="name" name="name" required>
+                    <input type="text" class="form-control" id="name" name="facility_name" required>
                 </div>
 
                 <div class="form-row">

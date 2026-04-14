@@ -84,6 +84,18 @@ Route::middleware(['auth', 'session_timeout'])->group(function () {
 
         Route::delete('/volunteers/{volunteer}', [VolunteerController::class, 'destroy'])
             ->name('volunteers.destroy');
+
+        Route::patch('/coordinator/volunteers/{volunteer}', [VolunteerController::class, 'coordinatorUpdate'])
+            ->name('coordinator.volunteers.update');
+
+        Route::post('/coordinator/volunteers/{volunteer}/credentials', [VolunteerController::class, 'storeCredential'])
+            ->name('coordinator.volunteers.credentials.store');
+
+        Route::patch('/coordinator/volunteers/{volunteer}/credentials/{credential}', [VolunteerController::class, 'updateCredential'])
+            ->name('coordinator.volunteers.credentials.update');
+
+        Route::delete('/coordinator/volunteers/{volunteer}/credentials/{credential}', [VolunteerController::class, 'destroyCredential'])
+            ->name('coordinator.volunteers.credentials.destroy');
     });
 
     /*
@@ -376,4 +388,45 @@ Route::get('/volunteer/assignments', function() {
 Route::get('/settings', function () {
     return view('settings');
 })->middleware(['auth', 'session_timeout'])->name('profile.edit');
+
+Route::post('/settings/email', function (\Illuminate\Http\Request $request) {
+    $validated = $request->validate([
+        'new_email'     => 'required|email|max:255|unique:users,email,' . auth()->id() . ',user_id',
+        'confirm_email' => 'required|same:new_email',
+    ], [
+        'new_email.unique'      => 'That email address is already in use.',
+        'confirm_email.same'    => 'Email addresses do not match.',
+    ]);
+
+    $user = auth()->user();
+    $oldEmail = $user->email;
+    $user->email = $validated['new_email'];
+    $user->save();
+
+    // Keep volunteer record in sync (volunteers are matched by email)
+    \App\Models\Volunteer::where('email', $oldEmail)->update(['email' => $validated['new_email']]);
+
+    return back()->with('email_success', 'Email address updated successfully.');
+})->middleware(['auth', 'session_timeout'])->name('settings.email');
+
+Route::post('/settings/password', function (\Illuminate\Http\Request $request) {
+    $validated = $request->validate([
+        'current_password' => 'required|string',
+        'new_password'     => 'required|string|min:10|confirmed',
+    ], [
+        'new_password.min'       => 'New password must be at least 10 characters.',
+        'new_password.confirmed' => 'New passwords do not match.',
+    ]);
+
+    $user = auth()->user();
+
+    if (!\Illuminate\Support\Facades\Hash::check($validated['current_password'], $user->password_hash)) {
+        return back()->withErrors(['current_password' => 'Current password is incorrect.'])->with('pw_error', true);
+    }
+
+    $user->password_hash = \Illuminate\Support\Facades\Hash::make($validated['new_password']);
+    $user->save();
+
+    return back()->with('password_success', 'Password updated successfully.');
+})->middleware(['auth', 'session_timeout'])->name('settings.password');
 Route::redirect('/reports/coverage', '/reports/coverage-summary')->name('reports.coverage');
