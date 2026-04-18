@@ -335,10 +335,22 @@ class MeetingController extends Controller
         return back()->with('success', 'Assignment cancelled.');
     }
 
+    /**
+     * Reinstate a declined or cancelled assignment back to pending confirmation.
+     *
+     * Allows a volunteer to reverse a decline or cancellation — for example if
+     * they change their mind or the cancellation was made in error. The status
+     * moves back to pending_confirmation so the volunteer must explicitly
+     * re-confirm, keeping the confirmation audit trail intact.
+     *
+     * Only declined or cancelled assignments can be reinstated; any other
+     * starting status is rejected to prevent invalid state transitions.
+     */
     public function reinstateAssignment(Request $request, MeetingAssignment $meetingAssignment)
     {
         $this->authorizeAssignmentOwnerOrCoordinator($meetingAssignment);
 
+        // Guard: only declined or cancelled assignments can be reinstated.
         if (!in_array($meetingAssignment->status, ['declined', 'cancelled'])) {
             if ($request->expectsJson()) {
                 return response()->json(['error' => 'Assignment cannot be reinstated from its current status.'], 422);

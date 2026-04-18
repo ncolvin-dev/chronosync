@@ -99,6 +99,22 @@ class Volunteer extends Model
         return $this->probation_status === 'active_probation';
     }
 
+    /**
+     * Calculate how long this volunteer has been clean.
+     *
+     * Returns an array with integer `years` and `months` components so views
+     * can format the value however they need (e.g. "2y 4m").
+     *
+     * Carbon 3 changed diffInYears() and diffInMonths() to return floats, so
+     * both values are explicitly cast to int to prevent decimal display. The
+     * months component is calculated from the anniversary of the last full year
+     * (clean_date + years) rather than from clean_date directly, giving the
+     * correct remainder months (e.g. 2 years and 4 months, not 28 months).
+     *
+     * Returns [0, 0] if clean_date is not set.
+     *
+     * @return array{years: int, months: int}
+     */
     public function cleanTime(): array
     {
         if (!$this->clean_date) {

@@ -321,32 +321,64 @@ Route::fallback(function () {
     return response()->view('errors.404', [], 404);
 });
 
-// Coordinator route aliases for dashboard
+/*
+|--------------------------------------------------------------------------
+| Coordinator Route Aliases
+|--------------------------------------------------------------------------
+|
+| Stable /coordinator/* URLs used throughout the coordinator UI. Each one
+| redirects to the canonical resource URL so the nav links never need to
+| know the underlying path structure.
+|
+*/
+Route::redirect('/coordinator/dashboard', '/')->name('coordinator.dashboard');
 Route::redirect('/coordinator/matching', '/meetings')->name('coordinator.matching');
 Route::redirect('/coordinator/facilities', '/facilities')->name('coordinator.facilities');
-
-// Coordinator route aliases
-Route::redirect('/coordinator/dashboard', '/')->name('coordinator.dashboard');
 Route::redirect('/coordinator/volunteers', '/volunteers')->name('coordinator.volunteers');
 Route::redirect('/coordinator/credentials', '/credentials')->name('coordinator.credentials');
 Route::redirect('/coordinator/sms-config', '/sms/configure')->name('coordinator.sms-config');
 
-// Volunteer self-service routes
+/*
+|--------------------------------------------------------------------------
+| Volunteer Self-Service Routes
+|--------------------------------------------------------------------------
+|
+| Stable /volunteer/* URLs for the volunteer-facing navbar. These are alias
+| routes — each one resolves the volunteer's ULID from the authenticated
+| user's email and redirects or renders accordingly. Keeping them separate
+| from the coordinator VolunteerController routes ensures volunteers can
+| never accidentally access another user's data via URL manipulation.
+|
+*/
 Route::redirect('/volunteer/dashboard', '/')->name('volunteer.dashboard');
+
 Route::get('/volunteer/profile', [VolunteerSelfController::class, 'profileRedirect'])
     ->middleware(['auth', 'session_timeout'])->name('volunteer.profile');
+
 Route::put('/volunteer/profile/update', [VolunteerSelfController::class, 'updateProfile'])
     ->middleware(['auth', 'session_timeout'])->name('volunteer.profile.update');
+
 Route::get('/volunteer/availability', [VolunteerSelfController::class, 'availabilityRedirect'])
     ->middleware(['auth', 'session_timeout'])->name('volunteer.availability');
+
 Route::get('/volunteer/assignments', [VolunteerSelfController::class, 'assignments'])
     ->middleware(['auth', 'session_timeout'])->name('volunteer.assignments');
 
-// Settings
+/*
+|--------------------------------------------------------------------------
+| Account Settings
+|--------------------------------------------------------------------------
+|
+| Email and password changes for the authenticated User record. These are
+| separate from volunteer profile edits — settings affect login credentials,
+| while profile edits affect scheduling data.
+|
+*/
 Route::get('/settings', [SettingsController::class, 'index'])
     ->middleware(['auth', 'session_timeout'])->name('profile.edit');
 Route::post('/settings/email', [SettingsController::class, 'updateEmail'])
     ->middleware(['auth', 'session_timeout'])->name('settings.email');
 Route::post('/settings/password', [SettingsController::class, 'updatePassword'])
     ->middleware(['auth', 'session_timeout'])->name('settings.password');
+
 Route::redirect('/reports/coverage', '/reports/coverage-summary')->name('reports.coverage');
