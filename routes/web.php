@@ -1,14 +1,16 @@
 <?php
 
 use App\Http\Controllers\Auth\AuthController;
-use App\Http\Controllers\VolunteerController;
-use App\Http\Controllers\FacilityController;
-use App\Http\Controllers\MeetingController;
-use App\Http\Controllers\MatchingController;
-use App\Http\Controllers\CredentialController;
-use App\Http\Controllers\SmsController;
-use App\Http\Controllers\ReportController;
 use App\Http\Controllers\AvailabilityController;
+use App\Http\Controllers\CredentialController;
+use App\Http\Controllers\FacilityController;
+use App\Http\Controllers\MatchingController;
+use App\Http\Controllers\MeetingController;
+use App\Http\Controllers\ReportController;
+use App\Http\Controllers\SettingsController;
+use App\Http\Controllers\SmsController;
+use App\Http\Controllers\VolunteerController;
+use App\Http\Controllers\VolunteerSelfController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -48,14 +50,7 @@ Route::post('/sms/webhook/response', [SmsController::class, 'handleResponse'])->
 
 Route::middleware(['auth', 'session_timeout'])->group(function () {
     // Dashboard
-    Route::get('/', function () {
-        $user = auth()->user();
-        $roles = is_array($user->roles) ? $user->roles : json_decode($user->roles, true) ?? [];
-        if (in_array('admin', $roles) || in_array('coordinator', $roles)) {
-            return view('coordinator.dashboard');
-        }
-        return view('volunteer.dashboard');
-    })->name('dashboard');
+    Route::get('/', [VolunteerSelfController::class, 'dashboard'])->name('dashboard');
     Route::redirect('/home', '/')->name('home');
 
     // Logout
@@ -69,6 +64,16 @@ Route::middleware(['auth', 'session_timeout'])->group(function () {
 
     Route::get('/volunteers/{volunteer}', [VolunteerController::class, 'show'])
         ->name('volunteers.show');
+
+    // Confirm / decline / cancel an assignment (volunteers can act on their own)
+    Route::post('/meeting-assignments/{meetingAssignment}/confirm', [MeetingController::class, 'confirmAssignment'])
+        ->name('meeting-assignments.confirm');
+    Route::post('/meeting-assignments/{meetingAssignment}/decline', [MeetingController::class, 'declineAssignment'])
+        ->name('meeting-assignments.decline');
+    Route::post('/meeting-assignments/{meetingAssignment}/cancel', [MeetingController::class, 'cancelAssignment'])
+        ->name('meeting-assignments.cancel');
+    Route::post('/meeting-assignments/{meetingAssignment}/reinstate', [MeetingController::class, 'reinstateAssignment'])
+        ->name('meeting-assignments.reinstate');
 
     Route::middleware('role:volunteer,coordinator,admin')->group(function () {
         Route::get('/volunteers/{volunteer}/edit', [VolunteerController::class, 'edit'])
@@ -183,13 +188,6 @@ Route::middleware(['auth', 'session_timeout'])->group(function () {
         Route::post('/meetings/{meeting}/send-reminder', [SmsController::class, 'sendReminder'])
             ->name('meetings.send-reminder');
 
-        // Confirm / decline / cancel an assignment
-        Route::post('/meeting-assignments/{meetingAssignment}/confirm', [MeetingController::class, 'confirmAssignment'])
-            ->name('meeting-assignments.confirm');
-        Route::post('/meeting-assignments/{meetingAssignment}/decline', [MeetingController::class, 'declineAssignment'])
-            ->name('meeting-assignments.decline');
-        Route::post('/meeting-assignments/{meetingAssignment}/cancel', [MeetingController::class, 'cancelAssignment'])
-            ->name('meeting-assignments.cancel');
     });
 
     /*
@@ -323,110 +321,64 @@ Route::fallback(function () {
     return response()->view('errors.404', [], 404);
 });
 
-// Coordinator route aliases for dashboard
+/*
+|--------------------------------------------------------------------------
+| Coordinator Route Aliases
+|--------------------------------------------------------------------------
+|
+| Stable /coordinator/* URLs used throughout the coordinator UI. Each one
+| redirects to the canonical resource URL so the nav links never need to
+| know the underlying path structure.
+|
+*/
+Route::redirect('/coordinator/dashboard', '/')->name('coordinator.dashboard');
 Route::redirect('/coordinator/matching', '/meetings')->name('coordinator.matching');
 Route::redirect('/coordinator/facilities', '/facilities')->name('coordinator.facilities');
-
-// Coordinator route aliases
-Route::redirect('/coordinator/dashboard', '/')->name('coordinator.dashboard');
 Route::redirect('/coordinator/volunteers', '/volunteers')->name('coordinator.volunteers');
 Route::redirect('/coordinator/credentials', '/credentials')->name('coordinator.credentials');
 Route::redirect('/coordinator/sms-config', '/sms/configure')->name('coordinator.sms-config');
 
-// Volunteer route aliases
+/*
+|--------------------------------------------------------------------------
+| Volunteer Self-Service Routes
+|--------------------------------------------------------------------------
+|
+| Stable /volunteer/* URLs for the volunteer-facing navbar. These are alias
+| routes — each one resolves the volunteer's ULID from the authenticated
+| user's email and redirects or renders accordingly. Keeping them separate
+| from the coordinator VolunteerController routes ensures volunteers can
+| never accidentally access another user's data via URL manipulation.
+|
+*/
 Route::redirect('/volunteer/dashboard', '/')->name('volunteer.dashboard');
-Route::get('/volunteer/profile', function() {
-    $volunteer = \App\Models\Volunteer::where('email', auth()->user()->email)->first();
-    if (!$volunteer) {
-        return redirect()->route('dashboard')->with('error', 'No volunteer record linked to your account.');
-    }
-    return redirect("/volunteers/{$volunteer->volunteer_id}");
-})->middleware(['auth', 'session_timeout'])->name('volunteer.profile');
 
-Route::post('/volunteer/profile/update', function(\Illuminate\Http\Request $request) {
-    $volunteer = \App\Models\Volunteer::where('email', auth()->user()->email)->first();
-    if (!$volunteer) {
-        return redirect()->route('dashboard')->with('error', 'No volunteer record linked to your account.');
-    }
-    $validated = $request->validate([
-        'first_name'  => 'sometimes|string|max:255',
-        'last_name'   => 'sometimes|string|max:255',
-        'phone'       => 'sometimes|string|max:20',
-        'dob'         => 'sometimes|date',
-        'date_of_birth' => 'sometimes|date',
-        'gender'      => 'sometimes|string|max:50',
-        'clean_date'  => 'sometimes|date',
-        'neighborhood'=> 'sometimes|nullable|string|max:255',
-        'bus_line'    => 'sometimes|nullable|string|max:255',
-    ]);
-    // Map date_of_birth → dob if submitted that way
-    if (isset($validated['date_of_birth']) && !isset($validated['dob'])) {
-        $validated['dob'] = $validated['date_of_birth'];
-        unset($validated['date_of_birth']);
-    }
-    $volunteer->fill($validated)->save();
-    return redirect("/volunteers/{$volunteer->volunteer_id}")->with('success', 'Profile updated successfully.');
-})->middleware(['auth', 'session_timeout'])->name('volunteer.profile.update');
+Route::get('/volunteer/profile', [VolunteerSelfController::class, 'profileRedirect'])
+    ->middleware(['auth', 'session_timeout'])->name('volunteer.profile');
 
-Route::get('/volunteer/availability', function() {
-    $volunteer = \App\Models\Volunteer::where('email', auth()->user()->email)->first();
-    if (!$volunteer) {
-        return redirect()->route('dashboard')->with('error', 'No volunteer record linked to your account.');
-    }
-    return redirect("/volunteers/{$volunteer->volunteer_id}/availability");
-})->middleware(['auth', 'session_timeout'])->name('volunteer.availability');
+Route::put('/volunteer/profile/update', [VolunteerSelfController::class, 'updateProfile'])
+    ->middleware(['auth', 'session_timeout'])->name('volunteer.profile.update');
 
-Route::get('/volunteer/assignments', function() {
-    $volunteer = \App\Models\Volunteer::where('email', auth()->user()->email)->first();
-    if (!$volunteer) {
-        return redirect()->route('dashboard')->with('error', 'No volunteer record linked to your account.');
-    }
-    return view('volunteer.assignments', compact('volunteer'));
-})->middleware(['auth', 'session_timeout'])->name('volunteer.assignments');
+Route::get('/volunteer/availability', [VolunteerSelfController::class, 'availabilityRedirect'])
+    ->middleware(['auth', 'session_timeout'])->name('volunteer.availability');
 
-// Profile and reports aliases
-Route::get('/settings', function () {
-    return view('settings');
-})->middleware(['auth', 'session_timeout'])->name('profile.edit');
+Route::get('/volunteer/assignments', [VolunteerSelfController::class, 'assignments'])
+    ->middleware(['auth', 'session_timeout'])->name('volunteer.assignments');
 
-Route::post('/settings/email', function (\Illuminate\Http\Request $request) {
-    $validated = $request->validate([
-        'new_email'     => 'required|email|max:255|unique:users,email,' . auth()->id() . ',user_id',
-        'confirm_email' => 'required|same:new_email',
-    ], [
-        'new_email.unique'      => 'That email address is already in use.',
-        'confirm_email.same'    => 'Email addresses do not match.',
-    ]);
+/*
+|--------------------------------------------------------------------------
+| Account Settings
+|--------------------------------------------------------------------------
+|
+| Email and password changes for the authenticated User record. These are
+| separate from volunteer profile edits — settings affect login credentials,
+| while profile edits affect scheduling data.
+|
+*/
+Route::get('/settings', [SettingsController::class, 'index'])
+    ->middleware(['auth', 'session_timeout'])->name('profile.edit');
+Route::post('/settings/email', [SettingsController::class, 'updateEmail'])
+    ->middleware(['auth', 'session_timeout'])->name('settings.email');
+Route::post('/settings/password', [SettingsController::class, 'updatePassword'])
+    ->middleware(['auth', 'session_timeout'])->name('settings.password');
 
-    $user = auth()->user();
-    $oldEmail = $user->email;
-    $user->email = $validated['new_email'];
-    $user->save();
-
-    // Keep volunteer record in sync (volunteers are matched by email)
-    \App\Models\Volunteer::where('email', $oldEmail)->update(['email' => $validated['new_email']]);
-
-    return back()->with('email_success', 'Email address updated successfully.');
-})->middleware(['auth', 'session_timeout'])->name('settings.email');
-
-Route::post('/settings/password', function (\Illuminate\Http\Request $request) {
-    $validated = $request->validate([
-        'current_password' => 'required|string',
-        'new_password'     => 'required|string|min:10|confirmed',
-    ], [
-        'new_password.min'       => 'New password must be at least 10 characters.',
-        'new_password.confirmed' => 'New passwords do not match.',
-    ]);
-
-    $user = auth()->user();
-
-    if (!\Illuminate\Support\Facades\Hash::check($validated['current_password'], $user->password_hash)) {
-        return back()->withErrors(['current_password' => 'Current password is incorrect.'])->with('pw_error', true);
-    }
-
-    $user->password_hash = \Illuminate\Support\Facades\Hash::make($validated['new_password']);
-    $user->save();
-
-    return back()->with('password_success', 'Password updated successfully.');
-})->middleware(['auth', 'session_timeout'])->name('settings.password');
 Route::redirect('/reports/coverage', '/reports/coverage-summary')->name('reports.coverage');
