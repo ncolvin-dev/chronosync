@@ -237,10 +237,13 @@ class MeetingController extends Controller
      */
     public function confirmAssignment(Request $request, MeetingAssignment $meetingAssignment)
     {
-        $this->authorizeCoordinatorOrAdmin();
+        $this->authorizeAssignmentOwnerOrCoordinator($meetingAssignment);
 
         // Guard: only pending assignments can be confirmed.
         if ($meetingAssignment->status !== 'pending_confirmation') {
+            if ($request->expectsJson()) {
+                return response()->json(['error' => 'Assignment is not in a pending state.'], 422);
+            }
             return back()->with('error', 'Assignment is not in a pending state.');
         }
 
@@ -256,6 +259,9 @@ class MeetingController extends Controller
             'change_details' => ['status' => ['old' => 'pending_confirmation', 'new' => 'confirmed']],
         ]);
 
+        if ($request->expectsJson()) {
+            return response()->json(['success' => true, 'message' => 'Assignment confirmed.']);
+        }
         return back()->with('success', 'Assignment confirmed.');
     }
 
@@ -267,7 +273,7 @@ class MeetingController extends Controller
      */
     public function declineAssignment(Request $request, MeetingAssignment $meetingAssignment)
     {
-        $this->authorizeCoordinatorOrAdmin();
+        $this->authorizeAssignmentOwnerOrCoordinator($meetingAssignment);
 
         $oldStatus                 = $meetingAssignment->status;
         $meetingAssignment->status = 'declined';
@@ -281,6 +287,9 @@ class MeetingController extends Controller
             'change_details' => ['status' => ['old' => $oldStatus, 'new' => 'declined']],
         ]);
 
+        if ($request->expectsJson()) {
+            return response()->json(['success' => true, 'message' => 'Assignment declined.']);
+        }
         return back()->with('success', 'Assignment declined.');
     }
 
@@ -292,7 +301,9 @@ class MeetingController extends Controller
      */
     public function cancelAssignment(Request $request, MeetingAssignment $meetingAssignment)
     {
-        $this->authorizeCoordinatorOrAdmin();
+        $this->authorizeAssignmentOwnerOrCoordinator($meetingAssignment);
+
+        $isCoordinatorOrAdmin = auth()->user()->hasAnyRole(['coordinator', 'admin']);
 
         $validated = $request->validate([
             'reason' => 'nullable|string|max:500',
@@ -313,12 +324,44 @@ class MeetingController extends Controller
             ],
         ]);
 
-        // Notify the volunteer so they are not waiting at the facility unnecessarily.
-        if ($meetingAssignment->volunteer?->is_sms_deliverable) {
+        // Only SMS the volunteer when a coordinator/admin is cancelling on their behalf.
+        if ($isCoordinatorOrAdmin && $meetingAssignment->volunteer?->is_sms_deliverable) {
             SendSmsJob::dispatch($meetingAssignment, 'cancellation');
         }
 
-        return back()->with('success', 'Assignment cancelled and volunteer notified.');
+        if ($request->expectsJson()) {
+            return response()->json(['success' => true, 'message' => 'Assignment cancelled.']);
+        }
+        return back()->with('success', 'Assignment cancelled.');
+    }
+
+    public function reinstateAssignment(Request $request, MeetingAssignment $meetingAssignment)
+    {
+        $this->authorizeAssignmentOwnerOrCoordinator($meetingAssignment);
+
+        if (!in_array($meetingAssignment->status, ['declined', 'cancelled'])) {
+            if ($request->expectsJson()) {
+                return response()->json(['error' => 'Assignment cannot be reinstated from its current status.'], 422);
+            }
+            return back()->with('error', 'Assignment cannot be reinstated from its current status.');
+        }
+
+        $oldStatus = $meetingAssignment->status;
+        $meetingAssignment->status = 'pending_confirmation';
+        $meetingAssignment->save();
+
+        AuditLog::create([
+            'actor_user_id'  => auth()->id(),
+            'action'         => 'reinstate_assignment',
+            'entity_type'    => 'meeting_assignments',
+            'entity_id'      => $meetingAssignment->meeting_assignment_id,
+            'change_details' => ['status' => ['old' => $oldStatus, 'new' => 'pending_confirmation']],
+        ]);
+
+        if ($request->expectsJson()) {
+            return response()->json(['success' => true, 'message' => 'Assignment reinstated.']);
+        }
+        return back()->with('success', 'Assignment reinstated.');
     }
 
     /**

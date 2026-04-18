@@ -2,11 +2,11 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Availability;
 use App\Models\Volunteer;
 use App\Models\AuditLog;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 class AvailabilityController extends Controller
 {
@@ -14,7 +14,6 @@ class AvailabilityController extends Controller
     {
         $this->authorizeVolunteerOrCoordinator($volunteer);
 
-        // Build a fast lookup keyed by "week-day-hour"
         $slots = $volunteer->availability()
             ->where('is_available', true)
             ->get()
@@ -30,23 +29,12 @@ class AvailabilityController extends Controller
         $data = $request->input('availability', []);
 
         return DB::transaction(function () use ($data, $volunteer, $request) {
-            // Wipe existing slots and rebuild from submitted data
             $volunteer->availability()->delete();
 
-            foreach ($data as $week => $days) {
-                foreach ($days as $day => $hours) {
-                    foreach ($hours as $hour => $value) {
-                        if ($value == '1') {
-                            Availability::create([
-                                'volunteer_id'  => $volunteer->volunteer_id,
-                                'week_of_month' => (int) $week,
-                                'day_of_week'   => (int) $day,
-                                'hour_start'    => (int) $hour,
-                                'is_available'  => true,
-                            ]);
-                        }
-                    }
-                }
+            $toInsert = $this->buildSlotRows($volunteer->volunteer_id, $data);
+
+            if (!empty($toInsert)) {
+                DB::table('availability')->insert($toInsert);
             }
 
             AuditLog::create([
@@ -68,8 +56,8 @@ class AvailabilityController extends Controller
 
     public function getForMatching(Volunteer $volunteer)
     {
-        $slots = $volunteer->availability()->where('is_available', true)->get();
-        $dayLabels = [1=>'Monday',2=>'Tuesday',3=>'Wednesday',4=>'Thursday',5=>'Friday',6=>'Saturday',7=>'Sunday'];
+        $slots     = $volunteer->availability()->where('is_available', true)->get();
+        $dayLabels = [1 => 'Monday', 2 => 'Tuesday', 3 => 'Wednesday', 4 => 'Thursday', 5 => 'Friday', 6 => 'Saturday', 7 => 'Sunday'];
 
         $formatted = $slots->map(fn($s) => [
             'week'      => $s->week_of_month,
@@ -105,20 +93,10 @@ class AvailabilityController extends Controller
 
                 $volunteer->availability()->delete();
 
-                foreach ($validated['availability'] as $week => $days) {
-                    foreach ($days as $day => $hours) {
-                        foreach ($hours as $hour => $value) {
-                            if ($value == '1') {
-                                Availability::create([
-                                    'volunteer_id'  => $volunteer->volunteer_id,
-                                    'week_of_month' => (int) $week,
-                                    'day_of_week'   => (int) $day,
-                                    'hour_start'    => (int) $hour,
-                                    'is_available'  => true,
-                                ]);
-                            }
-                        }
-                    }
+                $toInsert = $this->buildSlotRows($volunteer->volunteer_id, $validated['availability']);
+
+                if (!empty($toInsert)) {
+                    DB::table('availability')->insert($toInsert);
                 }
 
                 AuditLog::create([
@@ -137,7 +115,34 @@ class AvailabilityController extends Controller
         });
     }
 
-    private function authorizeVolunteerOrCoordinator(Volunteer $volunteer)
+    private function buildSlotRows(string $volunteerId, array $data): array
+    {
+        $rows = [];
+        $now  = now();
+
+        foreach ($data as $week => $days) {
+            foreach ($days as $day => $hours) {
+                foreach ($hours as $hour => $value) {
+                    if ($value == '1') {
+                        $rows[] = [
+                            'availability_id' => (string) Str::ulid(),
+                            'volunteer_id'    => $volunteerId,
+                            'week_of_month'   => (int) $week,
+                            'day_of_week'     => (int) $day,
+                            'hour_start'      => (int) $hour,
+                            'is_available'    => true,
+                            'created_at'      => $now,
+                            'updated_at'      => $now,
+                        ];
+                    }
+                }
+            }
+        }
+
+        return $rows;
+    }
+
+    private function authorizeVolunteerOrCoordinator(Volunteer $volunteer): void
     {
         $user = auth()->user();
 
@@ -145,19 +150,7 @@ class AvailabilityController extends Controller
             return;
         }
 
-        $roles = is_array($user->roles) ? $user->roles : json_decode($user->roles, true) ?? [];
-
-        if (!in_array('coordinator', $roles) && !in_array('admin', $roles)) {
-            abort(403);
-        }
-    }
-
-    private function authorizeAdmin()
-    {
-        $user = auth()->user();
-        $roles = is_array($user->roles) ? $user->roles : json_decode($user->roles, true) ?? [];
-
-        if (!in_array('admin', $roles)) {
+        if (!$user->hasAnyRole(['coordinator', 'admin'])) {
             abort(403);
         }
     }

@@ -99,6 +99,18 @@ class Volunteer extends Model
         return $this->probation_status === 'active_probation';
     }
 
+    public function cleanTime(): array
+    {
+        if (!$this->clean_date) {
+            return ['years' => 0, 'months' => 0];
+        }
+
+        $years  = (int) $this->clean_date->diffInYears(now());
+        $months = (int) $this->clean_date->copy()->addYears($years)->diffInMonths(now());
+
+        return ['years' => $years, 'months' => $months];
+    }
+
     /**
      * Check if volunteer is SMS deliverable.
      *

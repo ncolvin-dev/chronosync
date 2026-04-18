@@ -2,28 +2,42 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\MeetingAssignment;
+
 abstract class Controller
 {
-    /**
-     * Check that the authenticated user holds the coordinator or admin role.
-     *
-     * Roles are stored as a JSON array on the User model, so we decode if needed.
-     * Defined once here so every subcontroller inherits it without repeating the logic.
-     * Uses an early-return guard clause to keep the flow flat and readable.
-     */
     protected function authorizeCoordinatorOrAdmin(): void
     {
-        $user  = auth()->user();
-        $roles = is_array($user->roles)
-            ? $user->roles
-            : json_decode($user->roles, true) ?? [];
+        if (!$this->userHasAnyRole(['coordinator', 'admin'])) {
+            abort(403, 'Unauthorized.');
+        }
+    }
 
-        // Allow access for coordinators and admins — return immediately so the
-        // calling method can continue without nesting inside an if block.
-        if (in_array('coordinator', $roles) || in_array('admin', $roles)) {
+    protected function authorizeAdmin(): void
+    {
+        if (!$this->userHasAnyRole(['admin'])) {
+            abort(403, 'Unauthorized.');
+        }
+    }
+
+    protected function authorizeAssignmentOwnerOrCoordinator(MeetingAssignment $assignment): void
+    {
+        $user = auth()->user();
+
+        if ($user->email === $assignment->volunteer?->email) {
             return;
         }
 
-        abort(403, 'Unauthorized.');
+        if (!$this->userHasAnyRole(['coordinator', 'admin'])) {
+            abort(403, 'Unauthorized.');
+        }
+    }
+
+    private function userHasAnyRole(array $roles): bool
+    {
+        $user       = auth()->user();
+        $userRoles  = is_array($user->roles) ? $user->roles : json_decode($user->roles, true) ?? [];
+
+        return count(array_intersect($roles, $userRoles)) > 0;
     }
 }

@@ -275,16 +275,4 @@ class SmsController extends Controller
         // For now, this is a placeholder for the actual implementation
     }
 
-    /**
-     * Authorize admin only.
-     */
-    private function authorizeAdmin()
-    {
-        $user = auth()->user();
-        $roles = is_array($user->roles) ? $user->roles : json_decode($user->roles, true) ?? [];
-
-        if (!in_array('admin', $roles)) {
-            abort(403);
-        }
-    }
 }

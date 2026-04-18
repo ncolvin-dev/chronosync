@@ -450,195 +450,130 @@
                 <button class="filter-tab" data-filter="past">Past</button>
             </div>
 
-            <!-- All Assignments -->
-            <div class="tab-content active" id="all-assignments">
-                <div class="assignments-list">
-                    <!-- Confirmed Assignment Example -->
-                    <div class="assignment-card confirmed">
-                        <div class="assignment-header">
-                            <div class="assignment-facility">Harmony House Treatment Center</div>
-                            <span class="assignment-status confirmed">
+            <!-- Assignments List (filtered by JS) -->
+            @if($assignments->isEmpty())
+            <div class="empty-state">
+                <div class="empty-state-icon">
+                    <i class="fas fa-tasks"></i>
+                </div>
+                <div class="empty-state-title">No Assignments Yet</div>
+                <div class="empty-state-text">You have no meeting assignments at this time.</div>
+            </div>
+            @else
+            <div class="assignments-list" id="assignments-list">
+                @foreach($assignments as $assignment)
+                @php
+                    $meeting = $assignment->meeting;
+                    $facility = $meeting?->facility;
+                    $isPast = $assignment->assignment_date->lt(now()->startOfDay());
+                    $cardClass = match($assignment->status) {
+                        'confirmed' => 'confirmed',
+                        'pending_confirmation' => 'pending',
+                        default => 'scheduled',
+                    };
+                @endphp
+                <div class="assignment-card {{ $cardClass }}"
+                     data-assignment-id="{{ $assignment->meeting_assignment_id }}"
+                     data-status="{{ $assignment->status }}"
+                     data-past="{{ $isPast ? '1' : '0' }}">
+
+                    <div class="assignment-header">
+                        <div class="assignment-facility">{{ $facility?->facility_name ?? 'Unknown Facility' }}</div>
+                        <span class="assignment-status {{ $cardClass }}">
+                            @if($assignment->status === 'confirmed')
                                 <i class="fas fa-check-circle"></i> Confirmed
-                            </span>
-                        </div>
-
-                        <div class="assignment-details">
-                            <div class="assignment-detail-item">
-                                <div class="assignment-detail-icon">
-                                    <i class="fas fa-calendar"></i>
-                                </div>
-                                <div class="assignment-detail-content">
-                                    <div class="assignment-detail-label">Meeting Date</div>
-                                    <div class="assignment-detail-value">Tuesday, April 2, 2026</div>
-                                </div>
-                            </div>
-                            <div class="assignment-detail-item">
-                                <div class="assignment-detail-icon">
-                                    <i class="fas fa-clock"></i>
-                                </div>
-                                <div class="assignment-detail-content">
-                                    <div class="assignment-detail-label">Meeting Time</div>
-                                    <div class="assignment-detail-value">6:30 PM - 8:00 PM</div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="assignment-location">
-                            <div class="assignment-location-title">
-                                <i class="fas fa-map-marker-alt"></i> Meeting Location
-                            </div>
-                            <div class="assignment-location-address">
-                                Harmony House Treatment Center<br>
-                                123 Recovery Lane<br>
-                                Downtown, Metro City 12345
-                            </div>
-                        </div>
-
-                        <div class="assignment-actions">
-                            <button class="btn-action btn-view">
-                                <i class="fas fa-eye"></i> View Details
-                            </button>
-                            <button class="btn-action btn-decline">
-                                <i class="fas fa-times"></i> Cancel Commitment
-                            </button>
-                        </div>
+                            @elseif($assignment->status === 'pending_confirmation')
+                                <i class="fas fa-clock"></i> Pending Response
+                            @elseif($assignment->status === 'declined')
+                                <i class="fas fa-times-circle"></i> Declined
+                            @elseif($assignment->status === 'cancelled')
+                                <i class="fas fa-ban"></i> Cancelled
+                            @else
+                                <i class="fas fa-calendar-check"></i> Scheduled
+                            @endif
+                        </span>
                     </div>
 
-                    <!-- Pending Assignment Example -->
-                    <div class="assignment-card pending">
-                        <div class="assignment-header">
-                            <div class="assignment-facility">New Path Recovery Center</div>
-                            <span class="assignment-status pending">
-                                <i class="fas fa-clock"></i> Pending Response
-                            </span>
-                        </div>
-
-                        <div class="assignment-details">
-                            <div class="assignment-detail-item">
-                                <div class="assignment-detail-icon">
-                                    <i class="fas fa-calendar"></i>
-                                </div>
-                                <div class="assignment-detail-content">
-                                    <div class="assignment-detail-label">Meeting Date</div>
-                                    <div class="assignment-detail-value">Wednesday, April 3, 2026</div>
-                                </div>
+                    <div class="assignment-details">
+                        <div class="assignment-detail-item">
+                            <div class="assignment-detail-icon">
+                                <i class="fas fa-calendar"></i>
                             </div>
-                            <div class="assignment-detail-item">
-                                <div class="assignment-detail-icon">
-                                    <i class="fas fa-clock"></i>
-                                </div>
-                                <div class="assignment-detail-content">
-                                    <div class="assignment-detail-label">Meeting Time</div>
-                                    <div class="assignment-detail-value">7:00 PM - 8:30 PM</div>
+                            <div class="assignment-detail-content">
+                                <div class="assignment-detail-label">Meeting Date</div>
+                                <div class="assignment-detail-value">{{ $assignment->assignment_date->format('l, F j, Y') }}</div>
+                            </div>
+                        </div>
+                        @if($meeting)
+                        <div class="assignment-detail-item">
+                            <div class="assignment-detail-icon">
+                                <i class="fas fa-clock"></i>
+                            </div>
+                            <div class="assignment-detail-content">
+                                <div class="assignment-detail-label">Meeting Time</div>
+                                <div class="assignment-detail-value">
+                                    {{ \Carbon\Carbon::parse($meeting->meeting_time)->format('g:i A') }}
+                                    ({{ $meeting->duration_minutes }} min)
                                 </div>
                             </div>
                         </div>
+                        @endif
+                    </div>
 
-                        <div class="assignment-location">
-                            <div class="assignment-location-title">
-                                <i class="fas fa-map-marker-alt"></i> Meeting Location
-                            </div>
-                            <div class="assignment-location-address">
-                                New Path Recovery Center<br>
-                                456 Hope Street<br>
-                                Eastside, Metro City 12346
-                            </div>
+                    @if($facility)
+                    <div class="assignment-location">
+                        <div class="assignment-location-title">
+                            <i class="fas fa-map-marker-alt"></i> Meeting Location
                         </div>
+                        <div class="assignment-location-address">
+                            {{ $facility->facility_name }}<br>
+                            {{ $facility->address }}<br>
+                            {{ $facility->city }}, {{ $facility->state }} {{ $facility->zip }}
+                        </div>
+                    </div>
+                    @endif
 
-                        <div class="assignment-actions">
+                    <div class="assignment-actions">
+                        @if($assignment->status === 'pending_confirmation')
                             <button class="btn-action btn-confirm">
                                 <i class="fas fa-check"></i> Confirm Attendance
                             </button>
                             <button class="btn-action btn-decline">
                                 <i class="fas fa-times"></i> Decline
                             </button>
-                            <button class="btn-action btn-view">
-                                <i class="fas fa-eye"></i> View Details
+                        @elseif($assignment->status === 'confirmed' && !$isPast)
+                            <button class="btn-action btn-cancel">
+                                <i class="fas fa-times"></i> Cancel Commitment
                             </button>
-                        </div>
+                        @elseif(in_array($assignment->status, ['declined', 'cancelled']) && !$isPast)
+                            <button class="btn-action btn-reinstate">
+                                <i class="fas fa-undo"></i> Reinstate
+                            </button>
+                        @endif
+                        <button class="btn-action btn-view">
+                            <i class="fas fa-eye"></i> View Details
+                        </button>
                     </div>
 
-                    <!-- Scheduled Assignment Example -->
-                    <div class="assignment-card scheduled">
-                        <div class="assignment-header">
-                            <div class="assignment-facility">Sunrise Community Center</div>
-                            <span class="assignment-status scheduled">
-                                <i class="fas fa-calendar-check"></i> Scheduled
-                            </span>
-                        </div>
-
-                        <div class="assignment-details">
-                            <div class="assignment-detail-item">
-                                <div class="assignment-detail-icon">
-                                    <i class="fas fa-calendar"></i>
-                                </div>
-                                <div class="assignment-detail-content">
-                                    <div class="assignment-detail-label">Meeting Date</div>
-                                    <div class="assignment-detail-value">Thursday, April 4, 2026</div>
-                                </div>
-                            </div>
-                            <div class="assignment-detail-item">
-                                <div class="assignment-detail-icon">
-                                    <i class="fas fa-clock"></i>
-                                </div>
-                                <div class="assignment-detail-content">
-                                    <div class="assignment-detail-label">Meeting Time</div>
-                                    <div class="assignment-detail-value">5:00 PM - 6:30 PM</div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="assignment-location">
-                            <div class="assignment-location-title">
-                                <i class="fas fa-map-marker-alt"></i> Meeting Location
-                            </div>
-                            <div class="assignment-location-address">
-                                Sunrise Community Center<br>
-                                789 Main Avenue<br>
-                                Midtown, Metro City 12347
-                            </div>
-                        </div>
-
-                        <div class="assignment-actions">
-                            <button class="btn-action btn-view">
-                                <i class="fas fa-eye"></i> View Details
-                            </button>
-                        </div>
+                    <div class="assignment-extra-details" style="display:none; margin-top:1rem; padding-top:1rem; border-top:1px solid #e0e0e0; font-size:0.875rem; color:#555;">
+                        @if($meeting)
+                        <p style="margin:0;">
+                            <strong>Schedule:</strong> {{ $meeting->schedule_label }}<br>
+                            <strong>Format:</strong> {{ ucfirst(str_replace('_', ' ', $meeting->format)) }}<br>
+                            <strong>Assignment Type:</strong> {{ ucfirst($assignment->assignment_type) }}
+                            @if($assignment->confirmed_at)
+                            <br><strong>Confirmed At:</strong> {{ $assignment->confirmed_at->format('M j, Y g:i A') }}
+                            @endif
+                        </p>
+                        @endif
                     </div>
                 </div>
+                @endforeach
             </div>
-
-            <!-- Upcoming Assignments -->
-            <div class="tab-content" id="upcoming-assignments">
-                <p style="color: #666; text-align: center; padding: 2rem;">
-                    You have 3 upcoming assignments. Use the "All Assignments" tab to view them.
-                </p>
+            <div id="no-results-message" style="display:none; text-align:center; padding:2rem; color:#666;">
+                No assignments found for this filter.
             </div>
-
-            <!-- Confirmed Assignments -->
-            <div class="tab-content" id="confirmed-assignments">
-                <p style="color: #666; text-align: center; padding: 2rem;">
-                    You have 1 confirmed assignment.
-                </p>
-            </div>
-
-            <!-- Pending Assignments -->
-            <div class="tab-content" id="pending-assignments">
-                <p style="color: #666; text-align: center; padding: 2rem;">
-                    You have 1 pending assignment awaiting your response.
-                </p>
-            </div>
-
-            <!-- Past Assignments -->
-            <div class="tab-content" id="past-assignments">
-                <div class="empty-state">
-                    <div class="empty-state-icon">
-                        <i class="fas fa-history"></i>
-                    </div>
-                    <div class="empty-state-title">No Past Assignments</div>
-                    <div class="empty-state-text">You haven't attended any meetings yet.</div>
-                </div>
-            </div>
+            @endif
 
             <!-- SMS Reminder Notice -->
             <div class="sms-reminder">
@@ -659,31 +594,56 @@
 
 @section('extra-scripts')
 <script>
-    // Filter tabs
+    const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') ?? '';
+    const noResults = document.getElementById('no-results-message');
+
+    // Filter tabs — show/hide cards by status and date
     document.querySelectorAll('.filter-tab').forEach(tab => {
         tab.addEventListener('click', function() {
             const filter = this.getAttribute('data-filter');
-
-            // Update active tab
             document.querySelectorAll('.filter-tab').forEach(t => t.classList.remove('active'));
             this.classList.add('active');
 
-            // Update active content
-            document.querySelectorAll('.tab-content').forEach(content => {
-                content.classList.remove('active');
+            let visible = 0;
+            document.querySelectorAll('.assignment-card').forEach(card => {
+                const status = card.getAttribute('data-status');
+                const isPast = card.getAttribute('data-past') === '1';
+                let show = false;
+                if (filter === 'all') show = true;
+                else if (filter === 'upcoming') show = !isPast && (status === 'pending_confirmation' || status === 'confirmed');
+                else if (filter === 'confirmed') show = status === 'confirmed';
+                else if (filter === 'pending') show = status === 'pending_confirmation';
+                else if (filter === 'past') show = isPast;
+                card.style.display = show ? '' : 'none';
+                if (show) visible++;
             });
-            document.getElementById(filter + '-assignments').classList.add('active');
+            if (noResults) noResults.style.display = visible === 0 ? '' : 'none';
         });
     });
 
-    // Action buttons
+    function postAssignmentAction(id, action, successMessage) {
+        fetch('/meeting-assignments/' + id + '/' + action, {
+            method: 'POST',
+            headers: { 'X-CSRF-TOKEN': csrfToken, 'Accept': 'application/json' },
+        })
+        .then(res => {
+            if (!res.ok) return res.json().then(data => Promise.reject(data));
+            return res;
+        })
+        .then(() => {
+            alert(successMessage);
+            location.reload();
+        })
+        .catch(() => alert('Something went wrong. Please try again.'));
+    }
+
     document.querySelectorAll('.btn-confirm').forEach(btn => {
         btn.addEventListener('click', function() {
             const card = this.closest('.assignment-card');
-            const facility = card.querySelector('.assignment-facility').textContent;
+            const id = card.getAttribute('data-assignment-id');
+            const facility = card.querySelector('.assignment-facility').textContent.trim();
             if (confirm('Confirm your attendance at ' + facility + '?')) {
-                // Handle confirmation
-                alert('Your attendance has been confirmed!');
+                postAssignmentAction(id, 'confirm', 'Your attendance has been confirmed!');
             }
         });
     });
@@ -691,18 +651,45 @@
     document.querySelectorAll('.btn-decline').forEach(btn => {
         btn.addEventListener('click', function() {
             const card = this.closest('.assignment-card');
-            const facility = card.querySelector('.assignment-facility').textContent;
-            if (confirm('Are you sure you want to decline or cancel your attendance at ' + facility + '?')) {
-                // Handle decline
-                alert('Your response has been recorded.');
+            const id = card.getAttribute('data-assignment-id');
+            const facility = card.querySelector('.assignment-facility').textContent.trim();
+            if (confirm('Decline your assignment at ' + facility + '?')) {
+                postAssignmentAction(id, 'decline', 'You have declined this assignment.');
+            }
+        });
+    });
+
+    document.querySelectorAll('.btn-cancel').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const card = this.closest('.assignment-card');
+            const id = card.getAttribute('data-assignment-id');
+            const facility = card.querySelector('.assignment-facility').textContent.trim();
+            if (confirm('Cancel your commitment at ' + facility + '?')) {
+                postAssignmentAction(id, 'cancel', 'Your commitment has been cancelled.');
+            }
+        });
+    });
+
+    document.querySelectorAll('.btn-reinstate').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const card = this.closest('.assignment-card');
+            const id = card.getAttribute('data-assignment-id');
+            const facility = card.querySelector('.assignment-facility').textContent.trim();
+            if (confirm('Reinstate your assignment at ' + facility + '?')) {
+                postAssignmentAction(id, 'reinstate', 'Your assignment has been reinstated.');
             }
         });
     });
 
     document.querySelectorAll('.btn-view').forEach(btn => {
         btn.addEventListener('click', function() {
-            // Open details modal or navigate to details page
-            alert('Opening assignment details...');
+            const card = this.closest('.assignment-card');
+            const extra = card.querySelector('.assignment-extra-details');
+            const isVisible = extra.style.display !== 'none';
+            extra.style.display = isVisible ? 'none' : 'block';
+            this.innerHTML = isVisible
+                ? '<i class="fas fa-eye"></i> View Details'
+                : '<i class="fas fa-eye-slash"></i> Hide Details';
         });
     });
 </script>

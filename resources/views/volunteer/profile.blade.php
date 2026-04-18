@@ -3,6 +3,8 @@
 @section('title', 'Profile - ChronoSync')
 
 @section('extra-styles')
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
 <style>
     .profile-header {
         background: linear-gradient(135deg, #003366 0%, #0099cc 100%);
@@ -395,8 +397,8 @@
                         <i class="fas fa-calendar"></i> Clean Time:
                         @php
                             $cleanDate = $volunteer->clean_date;
-                            $years = \Carbon\Carbon::parse($cleanDate)->diffInYears(\Carbon\Carbon::now());
-                            $months = \Carbon\Carbon::parse($cleanDate)->addYears($years)->diffInMonths(\Carbon\Carbon::now());
+                            $years = (int)\Carbon\Carbon::parse($cleanDate)->diffInYears(\Carbon\Carbon::now());
+                            $months = (int)\Carbon\Carbon::parse($cleanDate)->addYears($years)->diffInMonths(\Carbon\Carbon::now());
                         @endphp
                         {{ $years }}y {{ $months }}m
                     </span>
@@ -483,7 +485,7 @@
 
                         <div class="form-group">
                             <label for="date_of_birth" class="form-label">Date of Birth</label>
-                            <input type="date" class="form-control" id="date_of_birth" name="date_of_birth" value="{{ $volunteer->dob }}" required>
+                            <input type="text" class="form-control datepicker" id="date_of_birth" name="date_of_birth" value="{{ $volunteer->dob?->format('Y-m-d') }}" placeholder="YYYY-MM-DD" required>
                         </div>
 
                         <div class="form-group">
@@ -499,7 +501,7 @@
 
                         <div class="form-group">
                             <label for="clean_date" class="form-label">Clean Date</label>
-                            <input type="date" class="form-control" id="clean_date" name="clean_date" value="{{ $volunteer->clean_date }}" required>
+                            <input type="text" class="form-control datepicker" id="clean_date" name="clean_date" value="{{ $volunteer->clean_date?->format('Y-m-d') }}" placeholder="YYYY-MM-DD" required>
                         </div>
 
                         <div class="button-group">
@@ -596,7 +598,7 @@
                             <div class="info-item">
                                 <div class="info-label">Probation Status</div>
                                 <div class="info-value">
-                                    @if(auth()->user()->on_probation)
+                                    @if($volunteer->isOnProbation())
                                         <span class="badge" style="background-color: #ffc107; color: #333;">Currently on Probation</span>
                                     @else
                                         <span class="badge badge-success">Not on Probation</span>
@@ -638,11 +640,11 @@
                             <label class="form-label">Probation Status</label>
                             <div>
                                 <div class="form-check">
-                                    <input type="radio" class="form-check-input" id="probation_yes" name="on_probation" value="1" {{ auth()->user()->on_probation ? 'checked' : '' }}>
+                                    <input type="radio" class="form-check-input" id="probation_yes" name="on_probation" value="1" {{ $volunteer->isOnProbation() ? 'checked' : '' }}>
                                     <label class="form-check-label" for="probation_yes">Currently on Probation</label>
                                 </div>
                                 <div class="form-check">
-                                    <input type="radio" class="form-check-input" id="probation_no" name="on_probation" value="0" {{ !auth()->user()->on_probation ? 'checked' : '' }}>
+                                    <input type="radio" class="form-check-input" id="probation_no" name="on_probation" value="0" {{ !$volunteer->isOnProbation() ? 'checked' : '' }}>
                                     <label class="form-check-label" for="probation_no">Not on Probation</label>
                                 </div>
                             </div>
@@ -702,10 +704,10 @@
                     <i class="fas fa-history"></i> Recent Changes
                 </div>
                 <div class="audit-item">
-                    <span class="audit-date">Profile Last Updated:</span> {{ auth()->user()->updated_at->format('M d, Y at h:i A') }}
+                    <span class="audit-date">Profile Last Updated:</span> {{ $volunteer->updated_at->format('M j, Y g:i A') }}
                 </div>
                 <div class="audit-item">
-                    <span class="audit-date">Account Created:</span> {{ auth()->user()->created_at->format('M d, Y at h:i A') }}
+                    <span class="audit-date">Account Created:</span> {{ auth()->user()->created_at->format('M j, Y g:i A') }}
                 </div>
             </div>
         </div>
@@ -724,6 +726,13 @@
             this.classList.toggle('collapsed');
             content.classList.toggle('show');
         });
+    });
+
+    // Date pickers
+    flatpickr('.datepicker', {
+        dateFormat: 'Y-m-d',
+        allowInput: true,
+        yearSelectorType: 'input',
     });
 
     // Edit button handlers
