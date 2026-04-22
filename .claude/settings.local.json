@@ -2,18 +2,8 @@
   "permissions": {
     "allow": [
       "Bash(find /c/Users/Sara/Projects/Chronosync/chronosync/database/migrations -name \"*.php\" -exec basename {} \\\\;)",
-      "Bash(PGPASSWORD='flyover-human-staunch' /Applications/Postgres.app/Contents/Versions/latest/bin/psql -h 3.142.254.132 -p 5432 -U owen -d chronosync -c \"\\\\dt\")",
-      "Bash(PGPASSWORD='flyover-human-staunch' /opt/homebrew/opt/postgresql@16/bin/psql -h 3.142.254.132 -p 5432 -U owen -d chronosync -c \"\\\\dt\")",
-      "Bash(PGPASSWORD='flyover-human-staunch' /opt/homebrew/opt/postgresql@16/bin/psql -h 3.142.254.132 -p 5432 -U owen -d chronosync -c \"SELECT COUNT\\(*\\) FROM users; SELECT COUNT\\(*\\) FROM volunteers; SELECT COUNT\\(*\\) FROM meetings;\")",
-      "Bash(PGPASSWORD='flyover-human-staunch' /opt/homebrew/opt/postgresql@16/bin/psql -h 3.142.254.132 -p 5432 -U owen -d chronosync -c \"SELECT user_id, email, roles FROM users LIMIT 5;\")",
-      "mcp__Claude_Preview__preview_start",
-      "Bash(php artisan tinker '--execute= *)",
-      "Bash(php artisan *)",
-      "Bash(grep -v \"^$\")",
-      "Bash(php -r \"echo session_save_path\\(\\);\")",
-      "Bash(find /Users/owena/Documents/Projects/chronosync/storage/framework/sessions -type f ! -name '.gitignore' -delete)",
-      "Bash(grep -n '$volunteer\\\\|$user\\\\|auth\\(\\)->user\\(\\)->' /Users/owena/Documents/Projects/chronosync/resources/views/settings.blade.php)",
-      "Bash(git add *)"
+      "Bash(php artisan:*)",
+      "Bash(xargs grep:*)"
     ]
   }
 }
