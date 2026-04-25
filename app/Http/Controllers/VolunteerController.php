@@ -68,11 +68,7 @@ class VolunteerController extends Controller
      */
     public function create()
     {
-        $facilities = Facility::where('status', 'active')
-            ->orderBy('facility_name')
-            ->get();
-
-        return view('placeholder.coming-soon', compact('facilities'));
+        return view('auth.register');
     }
 
     /**
@@ -85,56 +81,30 @@ class VolunteerController extends Controller
         return DB::transaction(function () use ($validated) {
             // Create user account
             $user = User::create([
-                'email' => $validated['email'],
-                'first_name' => $validated['first_name'],
-                'last_name' => $validated['last_name'],
-                'password' => Hash::make($validated['password']),
-                'roles' => json_encode(['volunteer']),
-                'is_active' => true,
+                'email'         => $validated['email'],
+                'password_hash' => Hash::make($validated['password']),
+                'roles'         => ['volunteer'],
             ]);
 
             // Create volunteer record
-            $volunteerData = [
-                'user_id' => $user->id,
-                'phone' => $validated['phone'],
-                'date_of_birth' => $validated['date_of_birth'],
-                'gender' => $validated['gender'],
-                'address_street' => $validated['address_street'],
-                'address_city' => $validated['address_city'],
-                'address_state' => $validated['address_state'],
-                'address_zip' => $validated['address_zip'],
-                'treatment_facility_id' => $validated['treatment_facility_id'] ?? null,
-                'is_self_recovery' => $validated['is_self_recovery'] ?? false,
-                'clean_date' => $validated['clean_date'] ?? null,
-                'certifications' => !empty($validated['certifications'])
-                    ? json_encode($validated['certifications'])
-                    : null,
-                'languages' => !empty($validated['languages'])
-                    ? json_encode($validated['languages'])
-                    : null,
-                'bio' => $validated['bio'] ?? null,
-                'emergency_contact_name' => $validated['emergency_contact_name'],
-                'emergency_contact_phone' => $validated['emergency_contact_phone'],
-                'is_active' => true,
-            ];
-
-            $volunteer = Volunteer::create($volunteerData);
-
-            // Initialize availability (35 slots: 5 weeks × 7 days, all false by default)
-            $volunteer->availability = json_encode(array_fill(0, 35, false));
-            $volunteer->save();
-
-            // Audit log
-            AuditLog::create([
-                'actor_user_id'  => auth()->id(),
-                'action'         => 'create_volunteer',
-                'entity_type'    => 'volunteers',
-                'entity_id'      => $volunteer->volunteer_id,
-                'change_details' => ['created' => true],
+            $volunteer = Volunteer::create([
+                'email'              => $validated['email'],
+                'first_name'         => $validated['first_name'],
+                'last_name'          => $validated['last_name'],
+                'dob'                => $validated['dob'],
+                'phone'              => $validated['phone'],
+                'gender'             => $validated['gender'],
+                'probation_status'   => ($validated['on_probation'] ?? false) ? 'active_probation' : 'not_probation',
+                'clean_date'         => $validated['clean_date'] ?? null,
+                'treatment_facility' => ($validated['has_treatment_facility'] ?? false) ? '1' : null,
+                'facility_name'      => $validated['treatment_facility_name'] ?? null,
+                'discharge_date'     => $validated['discharge_date'] ?? null,
+                'neighborhood'       => $validated['neighborhood'] ?? null,
+                'bus_line'           => $validated['bus_line'] ?? null,
             ]);
 
-            return redirect()->route('volunteers.show', $volunteer)
-                ->with('success', 'Volunteer registered successfully.');
+            return redirect()->route('login')
+                ->with('success', 'Account created! You can now log in.');
         });
     }
 
