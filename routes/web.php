@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Auth\AuthController;
 use App\Http\Controllers\AvailabilityController;
+use App\Http\Controllers\CoordinatorController;
 use App\Http\Controllers\CredentialController;
 use App\Http\Controllers\FacilityController;
 use App\Http\Controllers\MatchingController;
@@ -84,8 +85,18 @@ Route::middleware(['auth', 'session_timeout'])->group(function () {
 
     // Coordinator/Admin only
     Route::middleware('role:coordinator,admin')->group(function () {
+        Route::get('/coordinators', [CoordinatorController::class, 'index'])
+            ->name('coordinators.index');
+        Route::post('/coordinators', [CoordinatorController::class, 'store'])
+            ->name('coordinators.store');
+        Route::patch('/coordinators/{user}', [CoordinatorController::class, 'update'])
+            ->name('coordinators.update');
+
         Route::get('/volunteers', [VolunteerController::class, 'index'])
             ->name('volunteers.index');
+
+        Route::post('/coordinator/volunteers', [VolunteerController::class, 'store'])
+            ->name('coordinator.volunteers.store');
 
         Route::delete('/volunteers/{volunteer}', [VolunteerController::class, 'destroy'])
             ->name('volunteers.destroy');
@@ -300,6 +311,9 @@ Route::middleware(['auth', 'session_timeout'])->group(function () {
     */
 
     Route::middleware('role:admin')->group(function () {
+        Route::delete('/coordinators/{user}', [CoordinatorController::class, 'destroy'])
+            ->name('coordinators.destroy');
+
         // System settings, user management, audit logs, etc.
         Route::get('/admin/dashboard', function () {
             return view('coordinator.dashboard');
@@ -335,6 +349,7 @@ Route::redirect('/coordinator/dashboard', '/')->name('coordinator.dashboard');
 Route::redirect('/coordinator/matching', '/meetings')->name('coordinator.matching');
 Route::redirect('/coordinator/facilities', '/facilities')->name('coordinator.facilities');
 Route::redirect('/coordinator/volunteers', '/volunteers')->name('coordinator.volunteers');
+Route::redirect('/coordinator/coordinators', '/coordinators')->name('coordinator.coordinators');
 Route::redirect('/coordinator/credentials', '/credentials')->name('coordinator.credentials');
 Route::redirect('/coordinator/sms-config', '/sms/configure')->name('coordinator.sms-config');
 

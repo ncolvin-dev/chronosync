@@ -108,6 +108,13 @@
         background-color: #f8f9fa;
         display: flex;
         gap: 0.75rem;
+        align-items: stretch;
+    }
+
+    .facility-card-footer > *,
+    .facility-card-footer form {
+        flex: 1;
+        display: flex;
     }
 
     .btn-small {
@@ -119,6 +126,11 @@
         cursor: pointer;
         font-size: 0.85rem;
         text-align: center;
+        white-space: nowrap;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.3rem;
     }
 
     .btn-edit {
@@ -620,8 +632,16 @@
                         </div>
                     </div>
                     <div class="facility-card-footer">
+                        {{-- Edit --}}
+                        <div style="flex:1;display:flex;">
+                            <button type="button" class="btn-small btn-edit" style="width:100%;"
+                                    data-facility='@json($facility)'
+                                    onclick="openEditFacilityModal(this)">
+                                <i class="fas fa-edit"></i> Edit
+                            </button>
+                        </div>
                         {{-- Toggle active/inactive --}}
-                        <form method="POST" action="{{ route('facilities.toggle-status', $facility) }}" style="flex:1;">
+                        <form method="POST" action="{{ route('facilities.toggle-status', $facility) }}">
                             @csrf
                             @method('PATCH')
                             <button type="submit" class="btn-small"
@@ -632,7 +652,7 @@
                             </button>
                         </form>
                         {{-- Delete --}}
-                        <form method="POST" action="{{ route('facilities.destroy', $facility) }}" style="flex:1;"
+                        <form method="POST" action="{{ route('facilities.destroy', $facility) }}"
                               onsubmit="return confirm('Delete {{ addslashes($facility->facility_name) }}? This will also remove all its meeting slots.');">
                             @csrf
                             @method('DELETE')
@@ -677,6 +697,7 @@
 
         <form method="POST" action="{{ route('facilities.store') }}" id="facilityForm" novalidate>
             @csrf
+            <input type="hidden" name="_method" id="formMethod" value="POST">
 
             <div class="modal-body">
                 <!-- Basic Information -->
@@ -701,14 +722,9 @@
                 <div class="form-row">
                     <div class="form-group">
                         <label for="state" class="form-label">State *</label>
-                        <select class="form-select" id="state" name="state" required>
-                            <option value="">Select State</option>
-                            <option value="CA">California</option>
-                            <option value="NY">New York</option>
-                            <option value="TX">Texas</option>
-                            <option value="FL">Florida</option>
-                            <option value="PA">Pennsylvania</option>
-                        </select>
+                        <input type="text" class="form-control" id="state" name="state"
+                               placeholder="e.g. CA" maxlength="2" required
+                               style="text-transform:uppercase;">
                     </div>
                     <div class="form-group">
                         <label for="zip" class="form-label">ZIP Code *</label>
@@ -819,6 +835,7 @@
                 </div>
 
                 <!-- Meeting Schedule — multiple recurring slots -->
+                <div id="meetingScheduleSection">
                 <h4 style="margin: 1.5rem 0 0.5rem; color: #003366; font-weight: 600;">Meeting Schedule</h4>
                 <p style="font-size: 0.8rem; color: #666; margin-bottom: 1rem;">
                     Add one or more recurring meeting slots for this facility. Each slot defines when the meeting happens
@@ -832,6 +849,8 @@
                 <button type="button" class="btn-add-slot" id="addMeetingSlotBtn" onclick="addMeetingSlot()">
                     <i class="fas fa-plus-circle"></i> Add Another Meeting Slot
                 </button>
+
+                </div>{{-- #meetingScheduleSection --}}
 
                 <div class="checkbox-item">
                     <input type="checkbox" id="active" name="active" checked>
@@ -950,21 +969,60 @@
         });
     }
 
-    // Add the first slot automatically when the modal opens
     function openAddFacilityModal() {
+        const form = document.getElementById('facilityForm');
         document.getElementById('modalTitle').textContent = 'Add New Facility';
-        document.getElementById('facilityForm').reset();
-        // Clear and rebuild slots
+        form.reset();
+        form.action = '{{ route('facilities.store') }}';
+        document.getElementById('formMethod').value = 'POST';
+        document.getElementById('meetingScheduleSection').style.display = '';
         document.getElementById('meetingSlotsContainer').innerHTML = '';
         slotCount = 0;
         addMeetingSlot();
         document.getElementById('facilityModal').classList.add('show');
     }
 
-    function openEditFacilityModal(id) {
+    function openEditFacilityModal(btn) {
+        const f    = JSON.parse(btn.dataset.facility);
+        const form = document.getElementById('facilityForm');
+
         document.getElementById('modalTitle').textContent = 'Edit Facility';
+        form.action = '/facilities/' + f.facility_id;
+        document.getElementById('formMethod').value = 'PATCH';
+
+        // Basic info
+        document.getElementById('name').value                   = f.facility_name  ?? '';
+        document.getElementById('address').value               = f.address         ?? '';
+        document.getElementById('city').value                  = f.city            ?? '';
+        document.getElementById('state').value                 = (f.state          ?? '').toUpperCase();
+        document.getElementById('zip').value                   = f.zip             ?? '';
+
+        // Contact
+        document.getElementById('main_phone').value            = f.main_phone      ?? '';
+        document.getElementById('contact_email').value         = f.contact_email   ?? '';
+        document.getElementById('contact1_name').value         = f.contact1_name   ?? '';
+        document.getElementById('contact1_phone').value        = f.contact1_phone  ?? '';
+        document.getElementById('contact1_email').value        = f.contact1_email  ?? '';
+        document.getElementById('contact2_name').value         = f.contact2_name   ?? '';
+        document.getElementById('contact2_phone').value        = f.contact2_phone  ?? '';
+        document.getElementById('contact2_email').value        = f.contact2_email  ?? '';
+
+        // Requirements
+        document.getElementById('clean_time_requirement').value = f.clean_time_requirement ?? 0;
+
+        const credTypes = f.credentialing_types ?? [];
+        document.getElementById('cred_background').checked = credTypes.includes('background_check');
+        document.getElementById('cred_reference').checked  = credTypes.includes('reference_check');
+        document.getElementById('cred_training').checked   = credTypes.includes('training_certification');
+        document.getElementById('cred_medical').checked    = credTypes.includes('medical_exam');
+
+        document.getElementById('gender_restriction').checked = !!f.gender_restriction;
+        document.getElementById('probation_allowed').checked  = !!f.probation_allowed;
+
+        // Hide meeting schedule — update doesn't manage slots
+        document.getElementById('meetingScheduleSection').style.display = 'none';
+
         document.getElementById('facilityModal').classList.add('show');
-        // Load facility data (in real app)
     }
 
     function closeFacilityModal() {
@@ -996,5 +1054,71 @@
             closeFacilityModal();
         }
     });
+
+    // ── Client-side validation ──────────────────────────────────────────────
+    const REQUIRED_FIELDS = [
+        { id: 'name',                    label: 'Facility Name' },
+        { id: 'address',                 label: 'Street Address' },
+        { id: 'city',                    label: 'City' },
+        { id: 'state',                   label: 'State' },
+        { id: 'zip',                     label: 'ZIP Code' },
+        { id: 'main_phone',              label: 'Main Phone Number' },
+        { id: 'clean_time_requirement',  label: 'Minimum Clean Time' },
+    ];
+
+    function setFieldError(id, message) {
+        const el  = document.getElementById(id);
+        const err = document.getElementById('err-' + id);
+        if (!el) return;
+        el.style.borderColor = '#dc3545';
+        if (err) { err.textContent = message; err.style.display = 'block'; }
+    }
+
+    function clearFieldError(id) {
+        const el  = document.getElementById(id);
+        const err = document.getElementById('err-' + id);
+        if (el)  el.style.borderColor = '';
+        if (err) { err.textContent = ''; err.style.display = 'none'; }
+    }
+
+    function clearAllErrors() {
+        REQUIRED_FIELDS.forEach(f => clearFieldError(f.id));
+    }
+
+    // Attach error spans after the DOM is ready
+    REQUIRED_FIELDS.forEach(({ id }) => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        const span = document.createElement('span');
+        span.id = 'err-' + id;
+        span.style.cssText = 'color:#dc3545;font-size:0.78rem;display:none;margin-top:0.2rem;';
+        el.insertAdjacentElement('afterend', span);
+        el.addEventListener('input', () => clearFieldError(id));
+        el.addEventListener('change', () => clearFieldError(id));
+    });
+
+    document.getElementById('facilityForm').addEventListener('submit', function(e) {
+        clearAllErrors();
+        let firstError = null;
+
+        REQUIRED_FIELDS.forEach(({ id, label }) => {
+            const el = document.getElementById(id);
+            if (!el) return;
+            if (el.value.trim() === '' || el.value === null) {
+                setFieldError(id, label + ' is required.');
+                if (!firstError) firstError = el;
+            }
+        });
+
+        if (firstError) {
+            e.preventDefault();
+            firstError.focus();
+            firstError.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+    });
+
+    // Clear errors when modal is closed
+    const _origClose = closeFacilityModal;
+    closeFacilityModal = function() { clearAllErrors(); _origClose(); };
 </script>
 @endsection
