@@ -24,6 +24,11 @@ class CredentialType extends Model
         'expiration_days' => 'integer',
     ];
 
+    public function getDisplayNameAttribute(): string
+    {
+        return ucwords(str_replace('_', ' ', $this->name));
+    }
+
     /**
      * Relationship: Volunteer credentials of this type.
      */

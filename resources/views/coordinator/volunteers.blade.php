@@ -843,8 +843,8 @@
                 @forelse($volunteers as $volunteer)
                 @php
                     $initials   = strtoupper(substr($volunteer->first_name, 0, 1) . substr($volunteer->last_name, 0, 1));
-                    $cleanYears = $volunteer->clean_date->diffInYears(now());
-                    $cleanMonths = $volunteer->clean_date->copy()->addYears($cleanYears)->diffInMonths(now());
+                    $cleanYears = (int) $volunteer->clean_date->diffInYears(now());
+                    $cleanMonths = (int) $volunteer->clean_date->copy()->addYears($cleanYears)->diffInMonths(now());
                     $cleanLabel = $cleanYears . ' yr' . ($cleanYears != 1 ? 's' : '')
                                 . ' ' . $cleanMonths . ' mo';
                     $onProbation = $volunteer->probation_status === 'active_probation';
@@ -876,7 +876,7 @@
                         <div class="credentials-list">
                             @forelse($volunteer->credentials as $cred)
                                 @php
-                                    $typeName = $cred->credentialType?->name ?? 'Unknown';
+                                    $typeName = $cred->credentialType?->display_name ?? 'Unknown';
                                     $badgeClass = match($cred->status) {
                                         'pending' => 'pending',
                                         'denied'  => 'expired',

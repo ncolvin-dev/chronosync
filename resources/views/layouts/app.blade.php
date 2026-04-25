@@ -368,6 +368,11 @@
                                 </a>
                             </li>
                             <li class="nav-item">
+                                <a class="nav-link {{ request()->routeIs('coordinator.coordinators') ? 'active' : '' }}" href="{{ route('coordinator.coordinators') }}">
+                                    <i class="fas fa-user-tie"></i> Coordinators
+                                </a>
+                            </li>
+                            <li class="nav-item">
                                 <a class="nav-link {{ request()->routeIs('coordinator.matching') ? 'active' : '' }}" href="{{ route('coordinator.matching') }}">
                                     <i class="fas fa-link"></i> Matching
                                 </a>

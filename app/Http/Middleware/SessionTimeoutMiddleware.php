@@ -23,25 +23,37 @@ class SessionTimeoutMiddleware
      */
     public function handle(Request $request, Closure $next): Response
     {
-        if (!auth()->check()) {
+        try {
+            if (!auth()->check()) {
+                return $next($request);
+            }
+
+            $lastActivity = session(self::LAST_ACTIVITY_KEY);
+            $now = time();
+
+            if ($lastActivity && ($now - $lastActivity) > (self::TIMEOUT_MINUTES * 60)) {
+                return $this->forceLogout();
+            }
+
+            session([self::LAST_ACTIVITY_KEY => $now]);
+
             return $next($request);
+        } catch (\Throwable $e) {
+            return $this->forceLogout();
         }
+    }
 
-        $lastActivity = session(self::LAST_ACTIVITY_KEY);
-        $now = time();
-
-        // Check if session has timed out
-        if ($lastActivity && ($now - $lastActivity) > (self::TIMEOUT_MINUTES * 60)) {
+    private function forceLogout(): Response
+    {
+        try {
             auth()->logout();
             session()->flush();
-
-            return redirect()->route('login')
-                ->with('warning', 'Your session has expired due to inactivity. Please log in again.');
+            session()->regenerate();
+        } catch (\Throwable) {
+            // Session may already be invalid — ignore and redirect anyway
         }
 
-        // Update last activity time
-        session([self::LAST_ACTIVITY_KEY => $now]);
-
-        return $next($request);
+        return redirect()->route('login')
+            ->with('warning', 'Your session has expired. Please log in again.');
     }
 }
