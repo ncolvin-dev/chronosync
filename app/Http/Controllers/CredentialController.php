@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\VolunteerCredential;
 use App\Models\CredentialType;
 use App\Models\Volunteer;
+use App\Models\Facility;
 use App\Models\AuditLog;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -47,9 +48,11 @@ class CredentialController extends Controller
             });
         }
 
-        $credentials    = $query->orderBy('expiration_date')->paginate(20);
+        $credentials     = $query->orderBy('expiration_date')->paginate(20);
         $credentialTypes = CredentialType::orderBy('name')->get();
-        $expiringCount  = $this->getExpiringCredentialsCount();
+        $expiringCount   = $this->getExpiringCredentialsCount();
+        $volunteers      = Volunteer::orderBy('last_name')->orderBy('first_name')->get();
+        $facilities      = Facility::orderBy('facility_name')->get();
 
         // Credentials expiring within 30 days for the alert banner
         $expiringSoon = VolunteerCredential::with(['volunteer', 'credentialType'])
@@ -61,7 +64,7 @@ class CredentialController extends Controller
             ->get();
 
         return view('coordinator.credentials', compact(
-            'credentials', 'credentialTypes', 'expiringCount', 'expiringSoon'
+            'credentials', 'credentialTypes', 'expiringCount', 'expiringSoon', 'volunteers', 'facilities'
         ));
     }
 
@@ -138,6 +141,102 @@ class CredentialController extends Controller
         ]);
 
         return back()->with('success', 'Credential renewed.');
+    }
+
+    /**
+     * Create a new credential for a volunteer.
+     */
+    public function store(Request $request)
+    {
+        $this->authorizeCoordinatorOrAdmin();
+
+        $validated = $request->validate([
+            'volunteer_id'       => 'required|exists:volunteers,volunteer_id',
+            'facility_id'        => 'required|exists:facilities,facility_id',
+            'credential_type_id' => 'required|exists:credential_types,credential_type_id',
+            'status'             => 'required|in:pending,approved,denied',
+            'approval_date'      => 'nullable|date',
+            'expiration_date'    => 'nullable|date',
+            'notes'              => 'nullable|string|max:500',
+        ]);
+
+        $credential = VolunteerCredential::create($validated);
+
+        AuditLog::create([
+            'actor_user_id'  => auth()->id(),
+            'action'         => 'credential_added',
+            'entity_type'    => 'volunteer_credentials',
+            'entity_id'      => $credential->credential_id,
+            'change_details' => $validated,
+        ]);
+
+        return back()->with('success', 'Credential added successfully.');
+    }
+
+    /**
+     * Update status, dates, and notes for an existing credential.
+     */
+    public function update(Request $request, VolunteerCredential $credential)
+    {
+        $this->authorizeCoordinatorOrAdmin();
+
+        $validated = $request->validate([
+            'status'          => 'required|in:pending,approved,denied',
+            'approval_date'   => 'nullable|date',
+            'expiration_date' => 'nullable|date',
+            'notes'           => 'nullable|string|max:500',
+        ]);
+
+        $credential->fill($validated)->save();
+
+        AuditLog::create([
+            'actor_user_id'  => auth()->id(),
+            'action'         => 'credential_updated',
+            'entity_type'    => 'volunteer_credentials',
+            'entity_id'      => $credential->credential_id,
+            'change_details' => $validated,
+        ]);
+
+        return back()->with('success', 'Credential updated.');
+    }
+
+    /**
+     * Delete a credential.
+     */
+    public function destroy(VolunteerCredential $credential)
+    {
+        $this->authorizeCoordinatorOrAdmin();
+
+        AuditLog::create([
+            'actor_user_id'  => auth()->id(),
+            'action'         => 'credential_deleted',
+            'entity_type'    => 'volunteer_credentials',
+            'entity_id'      => $credential->credential_id,
+            'change_details' => [
+                'volunteer_id'    => $credential->volunteer_id,
+                'credential_type' => $credential->credentialType?->name,
+            ],
+        ]);
+
+        $credential->delete();
+
+        return back()->with('success', 'Credential removed.');
+    }
+
+    /**
+     * Return credentials expiring within 30 days (JSON).
+     */
+    public function getExpiringCredentials()
+    {
+        $this->authorizeCoordinatorOrAdmin();
+
+        return VolunteerCredential::with(['volunteer', 'credentialType', 'facility'])
+            ->where('status', 'approved')
+            ->whereNotNull('expiration_date')
+            ->whereDate('expiration_date', '<=', now()->addDays(30))
+            ->whereDate('expiration_date', '>', now())
+            ->orderBy('expiration_date')
+            ->get();
     }
 
     /**

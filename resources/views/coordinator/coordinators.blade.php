@@ -181,6 +181,7 @@
     /* Dark mode modal */
     html.dark .coord-modal-dialog { background: #1a2235; }
     html.dark .coord-modal-footer { border-top-color: #2a3a50; }
+    html.dark #c_email_display { background: #0f1929 !important; border-color: #2a3a50 !important; color: #94a3b8 !important; }
     html.dark .coord-form-label { color: #cbd5e1; }
     html.dark .coord-form-text  { color: #64748b; }
     html.dark .coord-form-control,
@@ -198,6 +199,8 @@
     }
     html.dark .coord-form-select option { background: #1a2235; color: #e2e8f0; }
     html.dark .coord-pw-strength { background: #2a3a50; }
+    html.dark .btn-coord-primary { background: #0099cc !important; color: #ffffff !important; }
+    html.dark .btn-coord-primary:hover { background: #003366 !important; color: #ffffff !important; }
     html.dark .btn-coord-secondary { background: #2a3a50; color: #cbd5e1; }
     html.dark .btn-coord-secondary:hover { background: #374f6b; }
 
@@ -653,11 +656,24 @@
 
             <div class="coord-modal-body">
 
-                <div class="coord-form-group">
-                    <label class="coord-form-label">Email Address <span style="color:#dc3545">*</span></label>
-                    <input type="email" class="coord-form-control" name="email" id="c_email"
-                           autocomplete="off" required>
-                    <div class="coord-error-msg" id="err-c_email"></div>
+                {{-- Promote mode: volunteer select --}}
+                <div class="coord-form-group" id="c_volunteer_group">
+                    <label class="coord-form-label">Volunteer <span style="color:#dc3545">*</span></label>
+                    <select class="coord-form-select" name="volunteer_id" id="c_volunteer">
+                        <option value="">Select a volunteer to promote…</option>
+                        @foreach($promotableVolunteers as $v)
+                            <option value="{{ $v->volunteer_id }}">
+                                {{ $v->last_name }}, {{ $v->first_name }} — {{ $v->email }}
+                            </option>
+                        @endforeach
+                    </select>
+                    <div class="coord-error-msg" id="err-c_volunteer"></div>
+                </div>
+
+                {{-- Edit mode: read-only email display --}}
+                <div class="coord-form-group" id="c_email_group" style="display:none;">
+                    <label class="coord-form-label">Coordinator</label>
+                    <div id="c_email_display" style="padding:0.5rem 0.75rem;background:#f0f4f8;border:1px solid #ddd;border-radius:0.5rem;font-size:0.875rem;color:#555;"></div>
                 </div>
 
                 <div class="coord-form-group">
@@ -669,23 +685,6 @@
                         @endif
                     </select>
                     <div class="coord-error-msg" id="err-c_role"></div>
-                </div>
-
-                <div class="coord-form-group" id="c_password_group">
-                    <label class="coord-form-label">Password <span style="color:#dc3545" id="c_pw_required_star">*</span></label>
-                    <input type="password" class="coord-form-control" name="password" id="c_password"
-                           autocomplete="new-password">
-                    <div class="coord-pw-strength"><div class="coord-pw-bar" id="c_pw_bar"></div></div>
-                    <div class="coord-pw-text" id="c_pw_text"></div>
-                    <div class="coord-form-text" id="c_pw_hint">Min 8 chars, uppercase, lowercase, number.</div>
-                    <div class="coord-error-msg" id="err-c_password"></div>
-                </div>
-
-                <div class="coord-form-group" id="c_password_confirm_group">
-                    <label class="coord-form-label">Confirm Password <span style="color:#dc3545" id="c_pwc_required_star">*</span></label>
-                    <input type="password" class="coord-form-control" name="password_confirmation"
-                           id="c_password_confirmation" autocomplete="new-password">
-                    <div class="coord-error-msg" id="err-c_password_confirmation"></div>
                 </div>
 
             </div>
@@ -703,43 +702,38 @@
 
 @section('extra-scripts')
 <script>
-    const ADD_URL  = '{{ route('coordinators.store') }}';
+    const ADD_URL   = '{{ route('coordinators.store') }}';
     const isEditing = { value: false };
+
+    function showGroup(id) { const el = document.getElementById(id); if (el) el.style.display = ''; }
+    function hideGroup(id) { const el = document.getElementById(id); if (el) el.style.display = 'none'; }
 
     function openAddCoordinatorModal() {
         isEditing.value = false;
-        document.getElementById('coordModalTitle').innerHTML = '<i class="fas fa-user-plus"></i> Add Coordinator';
-        document.getElementById('coordSubmitLabel').textContent = 'Add Coordinator';
+        document.getElementById('coordModalTitle').innerHTML = '<i class="fas fa-arrow-up"></i> Promote Volunteer';
+        document.getElementById('coordSubmitLabel').textContent = 'Promote';
         document.getElementById('coordFormMethod').value = 'POST';
         document.getElementById('coordinatorForm').action = ADD_URL;
         document.getElementById('coordinatorForm').reset();
-        document.getElementById('c_pw_hint').textContent = 'Min 8 chars, uppercase, lowercase, number.';
-        document.getElementById('c_pw_required_star').style.display = '';
-        document.getElementById('c_pwc_required_star').style.display = '';
-        document.getElementById('c_pw_bar').className = 'coord-pw-bar';
-        document.getElementById('c_pw_text').textContent = '';
+        showGroup('c_volunteer_group');
+        hideGroup('c_email_group');
         clearCoordErrors();
         document.getElementById('coordinatorModal').classList.add('show');
     }
 
     function openEditCoordinatorModal(data) {
         isEditing.value = true;
-        document.getElementById('coordModalTitle').innerHTML = '<i class="fas fa-user-edit"></i> Edit Coordinator';
-        document.getElementById('coordSubmitLabel').textContent = 'Save Changes';
+        document.getElementById('coordModalTitle').innerHTML = '<i class="fas fa-user-edit"></i> Edit Role';
+        document.getElementById('coordSubmitLabel').textContent = 'Save';
         document.getElementById('coordFormMethod').value = 'PATCH';
 
         const url = '{{ url('/coordinators') }}/' + data.user_id;
         document.getElementById('coordinatorForm').action = url;
 
-        document.getElementById('c_email').value = data.email;
-        document.getElementById('c_role').value  = data.role;
-        document.getElementById('c_password').value = '';
-        document.getElementById('c_password_confirmation').value = '';
-        document.getElementById('c_pw_hint').textContent = 'Leave blank to keep current password.';
-        document.getElementById('c_pw_required_star').style.display = 'none';
-        document.getElementById('c_pwc_required_star').style.display = 'none';
-        document.getElementById('c_pw_bar').className = 'coord-pw-bar';
-        document.getElementById('c_pw_text').textContent = '';
+        document.getElementById('c_email_display').textContent = data.email;
+        document.getElementById('c_role').value = data.role;
+        hideGroup('c_volunteer_group');
+        showGroup('c_email_group');
         clearCoordErrors();
         document.getElementById('coordinatorModal').classList.add('show');
     }
@@ -749,29 +743,8 @@
         clearCoordErrors();
     }
 
-    // Close on backdrop click
     document.getElementById('coordinatorModal').addEventListener('click', function(e) {
         if (e.target === this) closeCoordinatorModal();
-    });
-
-    // Password strength
-    document.getElementById('c_password').addEventListener('input', function() {
-        const pw = this.value;
-        let score = 0;
-        if (pw.length >= 8)  score++;
-        if (pw.length >= 12) score++;
-        if (/[a-z]/.test(pw)) score++;
-        if (/[A-Z]/.test(pw)) score++;
-        if (/[0-9]/.test(pw)) score++;
-        if (/[^a-zA-Z0-9]/.test(pw)) score++;
-        const s   = Math.min(Math.ceil(score / 2), 3);
-        const cls = ['', 'weak', 'fair', 'strong'][s];
-        const lbl = ['', 'Weak', 'Fair', 'Strong'][s];
-        const bar = document.getElementById('c_pw_bar');
-        const txt = document.getElementById('c_pw_text');
-        bar.className = 'coord-pw-bar' + (pw ? ' ' + cls : '');
-        txt.className = 'coord-pw-text' + (pw ? ' ' + cls : '');
-        txt.textContent = pw ? lbl + ' password' : '';
     });
 
     // ── Validation ──
@@ -790,25 +763,23 @@
     }
 
     function clearCoordErrors() {
-        ['c_email', 'c_role', 'c_password', 'c_password_confirmation'].forEach(clearCoordError);
+        ['c_volunteer', 'c_role'].forEach(clearCoordError);
     }
 
-    ['c_email', 'c_role', 'c_password', 'c_password_confirmation'].forEach(id => {
+    ['c_volunteer', 'c_role'].forEach(id => {
         const el = document.getElementById(id);
-        if (el) el.addEventListener('input', () => clearCoordError(id));
+        if (el) el.addEventListener('change', () => clearCoordError(id));
     });
 
     document.getElementById('coordinatorForm').addEventListener('submit', function(e) {
         clearCoordErrors();
         let first = null;
 
-        const email = document.getElementById('c_email').value.trim();
-        if (!email) {
-            setCoordError('c_email', 'Email address is required.');
-            if (!first) first = document.getElementById('c_email');
-        } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-            setCoordError('c_email', 'Please enter a valid email address.');
-            if (!first) first = document.getElementById('c_email');
+        if (!isEditing.value) {
+            if (!document.getElementById('c_volunteer').value) {
+                setCoordError('c_volunteer', 'Please select a volunteer to promote.');
+                if (!first) first = document.getElementById('c_volunteer');
+            }
         }
 
         if (!document.getElementById('c_role').value) {
@@ -816,29 +787,9 @@
             if (!first) first = document.getElementById('c_role');
         }
 
-        const pw  = document.getElementById('c_password').value;
-        const pwc = document.getElementById('c_password_confirmation').value;
-
-        // On add, password is required
-        if (!isEditing.value && !pw) {
-            setCoordError('c_password', 'Password is required.');
-            if (!first) first = document.getElementById('c_password');
-        }
-
-        if (pw && pw.length < 8) {
-            setCoordError('c_password', 'Password must be at least 8 characters.');
-            if (!first) first = document.getElementById('c_password');
-        }
-
-        if (pw && pwc && pw !== pwc) {
-            setCoordError('c_password_confirmation', 'Passwords do not match.');
-            if (!first) first = document.getElementById('c_password_confirmation');
-        }
-
         if (first) {
             e.preventDefault();
             first.focus();
-            first.scrollIntoView({ behavior: 'smooth', block: 'center' });
         }
     });
 </script>

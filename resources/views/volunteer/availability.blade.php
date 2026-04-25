@@ -152,6 +152,43 @@
         pointer-events: none;
     }
 
+    .btn-select-col {
+        width: 22px;
+        height: 22px;
+        border-radius: 4px;
+        border: 2px solid #0099cc;
+        background: white;
+        color: #0099cc;
+        font-size: 0.6rem;
+        font-weight: 700;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+        transition: all 0.2s;
+        padding: 0;
+        line-height: 1;
+        position: relative;
+        margin-bottom: 0.25rem;
+    }
+
+    .btn-select-col:hover {
+        background-color: #e6f7fc;
+    }
+
+    .btn-select-col.all-selected {
+        background-color: #0099cc;
+        color: white;
+    }
+
+    .grid-header-cell {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+    }
+
     .grid-cell {
         padding: 0.75rem;
         cursor: pointer;
@@ -378,6 +415,22 @@
         border-color: #0099cc;
     }
 
+    html.dark .btn-select-col {
+        border-color: #38bdf8;
+        background-color: #141d2e;
+        color: #38bdf8;
+    }
+
+    html.dark .btn-select-col:hover {
+        background-color: #1e3a50;
+    }
+
+    html.dark .btn-select-col.all-selected {
+        background-color: #0099cc;
+        color: white;
+        border-color: #0099cc;
+    }
+
     html.dark .btn-reset {
         background-color: #2a3a50;
         color: #cbd5e1;
@@ -484,13 +537,17 @@
                         <div class="availability-grid">
                             <div class="grid-header">
                                 <div class="grid-header-cell">Time</div>
-                                <div class="grid-header-cell">Mon</div>
-                                <div class="grid-header-cell">Tue</div>
-                                <div class="grid-header-cell">Wed</div>
-                                <div class="grid-header-cell">Thu</div>
-                                <div class="grid-header-cell">Fri</div>
-                                <div class="grid-header-cell">Sat</div>
-                                <div class="grid-header-cell">Sun</div>
+                                @php $dayNames = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun']; @endphp
+                                @foreach($dayNames as $dayIdx => $dayName)
+                                <div class="grid-header-cell">
+                                    <button type="button"
+                                        class="btn-select-col"
+                                        title="Select all"
+                                        onclick="toggleColumn({{ $week }}, {{ $dayIdx }}, this)">
+                                    </button>
+                                    {{ $dayName }}
+                                </div>
+                                @endforeach
                             </div>
 
                             <div class="grid-body">
@@ -594,6 +651,32 @@
     function toggleRow(week, hour, btn) {
         const cells = document.querySelectorAll(
             `#week-${week} .grid-cell[data-week="${week}"][data-hour="${hour}"]`
+        );
+        const allChecked = [...cells].every(c => c.querySelector('.availability-input').value === '1');
+
+        cells.forEach(cell => {
+            const input = cell.querySelector('.availability-input');
+            const indicator = cell.querySelector('.availability-indicator');
+            if (allChecked) {
+                input.value = '0';
+                cell.classList.remove('available');
+                cell.classList.add('unavailable');
+                indicator.classList.remove('available');
+            } else {
+                input.value = '1';
+                cell.classList.add('available');
+                cell.classList.remove('unavailable');
+                indicator.classList.add('available');
+            }
+        });
+
+        btn.classList.toggle('all-selected', !allChecked);
+    }
+
+    // Toggle all hours for a given day column
+    function toggleColumn(week, day, btn) {
+        const cells = document.querySelectorAll(
+            `#week-${week} .grid-cell[data-week="${week}"][data-day="${day}"]`
         );
         const allChecked = [...cells].every(c => c.querySelector('.availability-input').value === '1');
 
