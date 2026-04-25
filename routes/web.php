@@ -87,6 +87,9 @@ Route::middleware(['auth', 'session_timeout'])->group(function () {
         Route::get('/volunteers', [VolunteerController::class, 'index'])
             ->name('volunteers.index');
 
+        Route::post('/coordinator/volunteers', [VolunteerController::class, 'store'])
+            ->name('coordinator.volunteers.store');
+
         Route::delete('/volunteers/{volunteer}', [VolunteerController::class, 'destroy'])
             ->name('volunteers.destroy');
 

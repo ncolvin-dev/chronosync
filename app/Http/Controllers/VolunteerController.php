@@ -103,8 +103,9 @@ class VolunteerController extends Controller
                 'bus_line'           => $validated['bus_line'] ?? null,
             ]);
 
-            return redirect()->route('login')
-                ->with('success', 'Account created! You can now log in.');
+            return auth()->check()
+                ? redirect()->route('volunteers.index')->with('success', "Volunteer '{$volunteer->first_name} {$volunteer->last_name}' added successfully.")
+                : redirect()->route('login')->with('success', 'Account created! You can now log in.');
         });
     }
 
