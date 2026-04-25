@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\AuditLog;
 use App\Models\User;
+use App\Models\Volunteer;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 
@@ -29,7 +30,18 @@ class CoordinatorController extends Controller
 
         $coordinators = $query->orderBy('email')->paginate(15);
 
-        return view('coordinator.coordinators', compact('coordinators'));
+        // Volunteers not already holding a coordinator/admin role
+        $existingCoordEmails = User::where(function ($q) {
+            $q->whereJsonContains('roles', 'coordinator')
+              ->orWhereJsonContains('roles', 'admin');
+        })->pluck('email')->toArray();
+
+        $promotableVolunteers = Volunteer::whereNotIn('email', $existingCoordEmails)
+            ->orderBy('last_name')
+            ->orderBy('first_name')
+            ->get();
+
+        return view('coordinator.coordinators', compact('coordinators', 'promotableVolunteers'));
     }
 
     public function store(Request $request)
@@ -40,27 +52,41 @@ class CoordinatorController extends Controller
         $roleRule     = $actorIsAdmin ? 'required|in:coordinator,admin' : 'required|in:coordinator';
 
         $validated = $request->validate([
-            'email'    => 'required|email|unique:users,email',
-            'password' => 'required|string|min:8|confirmed',
-            'role'     => $roleRule,
+            'volunteer_id' => 'required|exists:volunteers,volunteer_id',
+            'role'         => $roleRule,
         ]);
 
-        $user = User::create([
-            'email'         => $validated['email'],
-            'password_hash' => Hash::make($validated['password']),
-            'roles'         => [$validated['role']],
-        ]);
+        $volunteer = Volunteer::findOrFail($validated['volunteer_id']);
+        $user      = User::where('email', $volunteer->email)->first();
+
+        if (!$user) {
+            return back()->with('error', "No login account found for {$volunteer->first_name} {$volunteer->last_name}.");
+        }
+
+        $currentRoles = is_array($user->roles) ? $user->roles : (json_decode($user->roles, true) ?? []);
+
+        if (in_array('coordinator', $currentRoles) || in_array('admin', $currentRoles)) {
+            return back()->with('error', "{$volunteer->first_name} {$volunteer->last_name} is already a coordinator or admin.");
+        }
+
+        $user->roles = array_values(array_unique(array_merge($currentRoles, [$validated['role']])));
+        $user->save();
 
         AuditLog::create([
             'actor_user_id'  => auth()->id(),
-            'action'         => 'create_coordinator',
+            'action'         => 'promote_to_coordinator',
             'entity_type'    => 'users',
             'entity_id'      => $user->user_id,
-            'change_details' => ['email' => $user->email, 'role' => $validated['role']],
+            'change_details' => [
+                'volunteer'  => $volunteer->first_name . ' ' . $volunteer->last_name,
+                'email'      => $user->email,
+                'role_added' => $validated['role'],
+                'all_roles'  => $user->roles,
+            ],
         ]);
 
         return redirect()->route('coordinators.index')
-            ->with('success', "Coordinator '{$user->email}' added successfully.");
+            ->with('success', "{$volunteer->first_name} {$volunteer->last_name} has been promoted to {$validated['role']}.");
     }
 
     public function update(Request $request, User $user)
@@ -69,7 +95,6 @@ class CoordinatorController extends Controller
 
         $actorIsAdmin = auth()->user()->hasRole('admin');
 
-        // Coordinators cannot edit admin users
         if (!$actorIsAdmin && $user->hasRole('admin')) {
             abort(403, 'Coordinators cannot edit admin accounts.');
         }
@@ -77,46 +102,28 @@ class CoordinatorController extends Controller
         $roleRule = $actorIsAdmin ? 'required|in:coordinator,admin' : 'required|in:coordinator';
 
         $validated = $request->validate([
-            'email'    => 'required|email|unique:users,email,' . $user->user_id . ',user_id',
-            'role'     => $roleRule,
-            'password' => 'nullable|string|min:8|confirmed',
+            'role' => $roleRule,
         ]);
 
-        $changes = [];
-
-        if ($user->email !== $validated['email']) {
-            $changes['email'] = ['old' => $user->email, 'new' => $validated['email']];
-            $user->email = $validated['email'];
-        }
-
-        $currentRoles = $user->roles ?? [];
+        $currentRoles = is_array($user->roles) ? $user->roles : (json_decode($user->roles, true) ?? []);
         $otherRoles   = array_values(array_diff($currentRoles, ['coordinator', 'admin']));
         $newRoles     = array_values(array_unique(array_merge($otherRoles, [$validated['role']])));
 
         if ($currentRoles !== $newRoles) {
-            $changes['roles'] = ['old' => $currentRoles, 'new' => $newRoles];
             $user->roles = $newRoles;
-        }
+            $user->save();
 
-        if (!empty($validated['password'])) {
-            $changes['password'] = ['old' => '***', 'new' => '***'];
-            $user->password_hash = Hash::make($validated['password']);
-        }
-
-        $user->save();
-
-        if (!empty($changes)) {
             AuditLog::create([
                 'actor_user_id'  => auth()->id(),
-                'action'         => 'update_coordinator',
+                'action'         => 'update_coordinator_role',
                 'entity_type'    => 'users',
                 'entity_id'      => $user->user_id,
-                'change_details' => $changes,
+                'change_details' => ['old_roles' => $currentRoles, 'new_roles' => $newRoles],
             ]);
         }
 
         return redirect()->route('coordinators.index')
-            ->with('success', "Coordinator '{$user->email}' updated successfully.");
+            ->with('success', "Role updated for '{$user->email}'.");
     }
 
     public function destroy(User $user)

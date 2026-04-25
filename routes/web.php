@@ -250,6 +250,12 @@ Route::middleware(['auth', 'session_timeout'])->group(function () {
         Route::post('/credentials/{credential}/renew', [CredentialController::class, 'renew'])
             ->name('credentials.renew');
 
+        Route::patch('/credentials/{credential}', [CredentialController::class, 'update'])
+            ->name('credentials.update');
+
+        Route::delete('/credentials/{credential}', [CredentialController::class, 'destroy'])
+            ->name('credentials.destroy');
+
         Route::get('/credentials/expiring', [CredentialController::class, 'getExpiringCredentials'])
             ->name('credentials.expiring');
     });
