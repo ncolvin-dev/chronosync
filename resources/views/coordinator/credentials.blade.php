@@ -284,7 +284,7 @@
                         @foreach($expiringSoon as $exp)
                         <li>
                             <strong>{{ $exp->volunteer->first_name }} {{ $exp->volunteer->last_name }}</strong>
-                            &mdash; {{ $exp->credentialType?->name ?? '—' }}
+                            &mdash; {{ $exp->credentialType?->display_name ?? '—' }}
                             &mdash; Expires {{ \Carbon\Carbon::parse($exp->expiration_date)->format('M j, Y') }}
                         </li>
                         @endforeach
@@ -370,7 +370,7 @@
                                 <small style="color:#999;">{{ $cred->volunteer->phone }}</small>
                             </td>
                             <td>{{ $cred->facility?->facility_name ?? '—' }}</td>
-                            <td>{{ $cred->credentialType?->name ?? '—' }}</td>
+                            <td>{{ $cred->credentialType?->display_name ?? '—' }}</td>
                             <td>{{ $cred->approval_date ? \Carbon\Carbon::parse($cred->approval_date)->format('M d, Y') : '—' }}</td>
                             <td>
                                 @if($cred->expiration_date)
