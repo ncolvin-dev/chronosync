@@ -721,10 +721,13 @@
 
                 <div class="form-row">
                     <div class="form-group">
-                        <label for="state" class="form-label">State *</label>
-                        <input type="text" class="form-control" id="state" name="state"
-                               placeholder="e.g. CA" maxlength="2" required
-                               style="text-transform:uppercase;">
+                        <label for="state" class="form-label">State / Territory *</label>
+                        <select class="form-control" id="state" name="state" required>
+                            <option value="">— Select —</option>
+                            @foreach(config('states.states') as $code => $label)
+                                <option value="{{ $code }}">{{ $label }}</option>
+                            @endforeach
+                        </select>
                     </div>
                     <div class="form-group">
                         <label for="zip" class="form-label">ZIP Code *</label>
