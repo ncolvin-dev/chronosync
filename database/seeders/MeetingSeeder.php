@@ -39,230 +39,98 @@ class MeetingSeeder extends Seeder
 
     public function run(): void
     {
-        $this->seedCAT();
-        $this->seedGlenwood();
-        $this->seedLumiere();
-        $this->seedTalbertAdapt();
-        $this->seedBrookside();
-        $this->seedJosephHouse();
-        $this->seedBarronCenter();
-        $this->seedAdamsRecovery();
-        $this->seedTalbertPathways();
-        $this->seedRiverCity();
-        $this->seedHattonCenter();
-        $this->seedCrossroads();
-        $this->seedTalbertSpringGrove();
-    }
+        $metroHospital   = Facility::where('facility_name', 'Metro Hospital')->first();
+        $countyJail      = Facility::where('facility_name', 'County Jail')->first();
+        $treatmentCenter = Facility::where('facility_name', 'Springfield Treatment Center')->first();
+        $communityCenter = Facility::where('facility_name', 'Community Center')->first();
+        $youthDetention  = Facility::where('facility_name', 'Youth Detention Center')->first();
 
-    // ── Center for Addiction Treatment ────────────────────────────────────
-    // Sunday 5:30 pm MEN ONLY, Monday 6 pm co-ed,
-    // Tuesday 7 pm MEN ONLY, Tuesday 1:30 pm Detox (co-ed)
-    private function seedCAT(): void
-    {
-        $f = Facility::where('facility_name', 'Center for Addiction Treatment')->first();
-        if (!$f) return;
-
-        $meetings = [
-            [
-                'day_of_week'  => self::SUN,
-                'meeting_time' => '17:30:00',
-                'notes'        => 'Men only',
-            ],
-            [
-                'day_of_week'  => self::MON,
-                'meeting_time' => '18:00:00',
-                'notes'        => null,
-            ],
-            [
-                'day_of_week'  => self::TUE,
-                'meeting_time' => '19:00:00',
-                'notes'        => 'Men only',
-            ],
-            [
-                'day_of_week'  => self::TUE,
-                'meeting_time' => '13:30:00',
-                'notes'        => 'Detox meeting',
-            ],
-        ];
-
-        foreach ($meetings as $m) {
-            Meeting::create(array_merge($this->defaults($f->facility_id), $m));
-        }
-    }
-
-    // ── Glenwood Behavioral Health Hospital ───────────────────────────────
-    // 7 pm — day not specified; defaulted to Wednesday ⚠️
-    private function seedGlenwood(): void
-    {
-        $f = Facility::where('facility_name', 'Glenwood Behavioral Health Hospital')->first();
-        if (!$f) return;
-
-        Meeting::create(array_merge($this->defaults($f->facility_id), [
-            'day_of_week'  => self::WED, // ⚠️ assumed — update if incorrect
-            'meeting_time' => '19:00:00',
-        ]));
-    }
-
-    // ── Lumiere Healing Center ────────────────────────────────────────────
-    // Saturday 7 pm, Sunday 7 pm
-    private function seedLumiere(): void
-    {
-        $f = Facility::where('facility_name', 'Lumiere Healing Center')->first();
-        if (!$f) return;
-
-        foreach ([self::SAT, self::SUN] as $day) {
-            Meeting::create(array_merge($this->defaults($f->facility_id), [
-                'day_of_week'  => $day,
-                'meeting_time' => '19:00:00',
-            ]));
-        }
-    }
-
-    // ── Talbert House ADAPT ───────────────────────────────────────────────
-    // Tuesday 7 pm
-    private function seedTalbertAdapt(): void
-    {
-        $f = Facility::where('facility_name', 'Talbert House ADAPT')->first();
-        if (!$f) return;
-
-        Meeting::create(array_merge($this->defaults($f->facility_id), [
-            'day_of_week'  => self::TUE,
-            'meeting_time' => '19:00:00',
-        ]));
-    }
-
-    // ── Brookside Health Center ───────────────────────────────────────────
-    // 6 pm — day not specified; defaulted to Thursday ⚠️
-    private function seedBrookside(): void
-    {
-        $f = Facility::where('facility_name', 'Brookside Health Center')->first();
-        if (!$f) return;
-
-        Meeting::create(array_merge($this->defaults($f->facility_id), [
-            'day_of_week'  => self::THU, // ⚠️ assumed — update if incorrect
-            'meeting_time' => '18:00:00',
-        ]));
-    }
-
-    // ── Joseph House ──────────────────────────────────────────────────────
-    // Friday 5:30 pm
-    private function seedJosephHouse(): void
-    {
-        $f = Facility::where('facility_name', 'Joseph House')->first();
-        if (!$f) return;
-
-        Meeting::create(array_merge($this->defaults($f->facility_id), [
-            'day_of_week'  => self::FRI,
-            'meeting_time' => '17:30:00',
-        ]));
-    }
-
-    // ── Barron Center ─────────────────────────────────────────────────────
-    // Thursday 7 pm
-    private function seedBarronCenter(): void
-    {
-        $f = Facility::where('facility_name', 'Barron Center')->first();
-        if (!$f) return;
-
-        Meeting::create(array_merge($this->defaults($f->facility_id), [
-            'day_of_week'  => self::THU,
-            'meeting_time' => '19:00:00',
-        ]));
-    }
-
-    // ── Adams Recovery Center ─────────────────────────────────────────────
-    // Saturday 7 pm
-    private function seedAdamsRecovery(): void
-    {
-        $f = Facility::where('facility_name', 'Adams Recovery Center')->first();
-        if (!$f) return;
-
-        Meeting::create(array_merge($this->defaults($f->facility_id), [
-            'day_of_week'  => self::SAT,
-            'meeting_time' => '19:00:00',
-        ]));
-    }
-
-    // ── Talbert House Pathways ────────────────────────────────────────────
-    // Saturday 11 am
-    private function seedTalbertPathways(): void
-    {
-        $f = Facility::where('facility_name', 'Talbert House Pathways')->first();
-        if (!$f) return;
-
-        Meeting::create(array_merge($this->defaults($f->facility_id), [
-            'day_of_week'  => self::SAT,
-            'meeting_time' => '11:00:00',
-        ]));
-    }
-
-    // ── River City Correctional Center ────────────────────────────────────
-    // Saturday 7 pm (men only — reflected in facility gender_restriction)
-    private function seedRiverCity(): void
-    {
-        $f = Facility::where('facility_name', 'River City Correctional Center')->first();
-        if (!$f) return;
-
-        Meeting::create(array_merge($this->defaults($f->facility_id), [
-            'day_of_week'  => self::SAT,
-            'meeting_time' => '19:00:00',
-            'notes'        => 'Men only (correctional facility)',
-        ]));
-    }
-
-    // ── Esther Marie Hatton Center for Women ─────────────────────────────
-    // Tuesday 2 pm (women only — reflected in facility gender_restriction)
-    private function seedHattonCenter(): void
-    {
-        $f = Facility::where('facility_name', 'Esther Marie Hatton Center for Women')->first();
-        if (!$f) return;
-
-        Meeting::create(array_merge($this->defaults($f->facility_id), [
-            'day_of_week'  => self::TUE,
-            'meeting_time' => '14:00:00',
-            'notes'        => 'Women only',
-        ]));
-    }
-
-    // ── Crossroads Center ─────────────────────────────────────────────────
-    // Monday 7 pm
-    private function seedCrossroads(): void
-    {
-        $f = Facility::where('facility_name', 'Crossroads Center')->first();
-        if (!$f) return;
-
-        Meeting::create(array_merge($this->defaults($f->facility_id), [
-            'day_of_week'  => self::MON,
-            'meeting_time' => '19:00:00',
-        ]));
-    }
-
-    // ── Talbert House Spring Grove Center ─────────────────────────────────
-    // Friday 7 pm
-    private function seedTalbertSpringGrove(): void
-    {
-        $f = Facility::where('facility_name', 'Talbert House Spring Grove Center')->first();
-        if (!$f) return;
-
-        Meeting::create(array_merge($this->defaults($f->facility_id), [
-            'day_of_week'  => self::FRI,
-            'meeting_time' => '19:00:00',
-        ]));
-    }
-
-    // ── Shared defaults for every meeting ────────────────────────────────
-
-    private function defaults(string $facilityId): array
-    {
-        return [
-            'facility_id'      => $facilityId,
-            'week_of_month'    => null,    // null = every week of the month
+        // Metro Hospital — Monday at 2pm (active)
+        Meeting::create([
+            'facility_id'      => $metroHospital?->facility_id,
+            'scheduled_time'   => Carbon::parse('next monday')->setTime(14, 0),
             'duration_minutes' => 60,
             'format'           => 'in_person',
             'volunteers_needed'=> 2,
-            'status'           => 'scheduled',
-            'notes'            => null,
-            'scheduled_time'   => null,    // recurring pattern — no fixed date
-        ];
+            'status'           => 'active',
+            'notes'            => 'Metro Hospital Monday meeting',
+        ]);
+
+        // County Jail — Wednesday at 7pm (active)
+        Meeting::create([
+            'facility_id'      => $countyJail?->facility_id,
+            'scheduled_time'   => Carbon::parse('next wednesday')->setTime(19, 0),
+            'duration_minutes' => 60,
+            'format'           => 'in_person',
+            'volunteers_needed'=> 2,
+            'status'           => 'active',
+            'notes'            => 'County Jail Wednesday meeting',
+        ]);
+
+        // County Jail — Friday at 7pm (inactive — facility temporarily unavailable)
+        Meeting::create([
+            'facility_id'      => $countyJail?->facility_id,
+            'scheduled_time'   => Carbon::parse('next friday')->setTime(19, 0),
+            'duration_minutes' => 60,
+            'format'           => 'in_person',
+            'volunteers_needed'=> 1,
+            'status'           => 'inactive',
+            'notes'            => 'County Jail Friday meeting — currently suspended',
+        ]);
+
+        // Springfield Treatment Center — Thursday at 6pm (active)
+        Meeting::create([
+            'facility_id'      => $treatmentCenter?->facility_id,
+            'scheduled_time'   => Carbon::parse('next thursday')->setTime(18, 0),
+            'duration_minutes' => 60,
+            'format'           => 'in_person',
+            'volunteers_needed'=> 2,
+            'status'           => 'active',
+            'notes'            => 'Treatment Center Thursday meeting',
+        ]);
+
+        // Community Center — Tuesday at 9am (active)
+        Meeting::create([
+            'facility_id'      => $communityCenter?->facility_id,
+            'scheduled_time'   => Carbon::parse('next tuesday')->setTime(9, 0),
+            'duration_minutes' => 60,
+            'format'           => 'in_person',
+            'volunteers_needed'=> 3,
+            'status'           => 'active',
+            'notes'            => 'Community Center Tuesday morning meeting',
+        ]);
+
+        // Community Center — Friday at 5pm (active)
+        Meeting::create([
+            'facility_id'      => $communityCenter?->facility_id,
+            'scheduled_time'   => Carbon::parse('next friday')->setTime(17, 0),
+            'duration_minutes' => 60,
+            'format'           => 'in_person',
+            'volunteers_needed'=> 2,
+            'status'           => 'active',
+            'notes'            => 'Community Center Friday afternoon meeting',
+        ]);
+
+        // Youth Detention Center — Monday at 3pm (active)
+        Meeting::create([
+            'facility_id'      => $youthDetention?->facility_id,
+            'scheduled_time'   => Carbon::parse('next monday')->setTime(15, 0),
+            'duration_minutes' => 60,
+            'format'           => 'in_person',
+            'volunteers_needed'=> 2,
+            'status'           => 'active',
+            'notes'            => 'Youth Detention Monday meeting',
+        ]);
+
+        // Youth Detention Center — Wednesday at 3pm (inactive — under review)
+        Meeting::create([
+            'facility_id'      => $youthDetention?->facility_id,
+            'scheduled_time'   => Carbon::parse('next wednesday')->setTime(15, 0),
+            'duration_minutes' => 60,
+            'format'           => 'in_person',
+            'volunteers_needed'=> 1,
+            'status'           => 'inactive',
+            'notes'            => 'Youth Detention Wednesday meeting — under review',
+        ]);
     }
 }
