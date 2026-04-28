@@ -373,6 +373,11 @@
                                 </a>
                             </li>
                             <li class="nav-item">
+                                <a class="nav-link {{ request()->routeIs('meetings.index') ? 'active' : '' }}" href="{{ route('meetings.index') }}">
+                                    <i class="fas fa-calendar-alt"></i> Meetings
+                                </a>
+                            </li>
+                            <li class="nav-item">
                                 <a class="nav-link {{ request()->routeIs('coordinator.matching') ? 'active' : '' }}" href="{{ route('coordinator.matching') }}">
                                     <i class="fas fa-link"></i> Matching
                                 </a>

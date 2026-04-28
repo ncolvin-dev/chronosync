@@ -79,27 +79,6 @@
         margin-top: 0.25rem;
     }
 
-    .form-row {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 1rem;
-    }
-
-    .time-input-group {
-        display: flex;
-        gap: 0.5rem;
-        align-items: flex-end;
-    }
-
-    .time-input-group .form-control {
-        flex: 1;
-    }
-
-    .time-separator {
-        color: #999;
-        font-weight: 600;
-    }
-
     .template-editor {
         background: white;
         border-radius: 0.75rem;
@@ -245,25 +224,10 @@
         font-weight: 600;
     }
 
-    .status-sent {
-        background-color: #d4edda;
-        color: #155724;
-    }
-
-    .status-delivered {
-        background-color: #d1ecf1;
-        color: #0c5460;
-    }
-
-    .status-failed {
-        background-color: #f8d7da;
-        color: #721c24;
-    }
-
-    .status-pending {
-        background-color: #fff3cd;
-        color: #856404;
-    }
+    .status-sent      { background-color: #d4edda; color: #155724; }
+    .status-delivered { background-color: #d1ecf1; color: #0c5460; }
+    .status-failed    { background-color: #f8d7da; color: #721c24; }
+    .status-pending   { background-color: #fff3cd; color: #856404; }
 
     .button-group {
         display: flex;
@@ -300,56 +264,22 @@
         background-color: #d0d0d0;
     }
 
-    .empty-state {
-        text-align: center;
-        padding: 2rem;
-        background-color: #f8f9fa;
-        border-radius: 0.5rem;
-        color: #999;
-    }
-
     @media (max-width: 1024px) {
-        .content-grid {
-            grid-template-columns: 1fr;
-        }
+        .content-grid { grid-template-columns: 1fr; }
     }
 
     @media (max-width: 768px) {
-        .sms-title {
-            font-size: 1.25rem;
-        }
+        .sms-title { font-size: 1.25rem; }
 
-        .form-row {
-            grid-template-columns: 1fr;
-        }
+        .placeholder-grid { grid-template-columns: 1fr; }
 
-        .time-input-group {
-            flex-direction: column;
-            align-items: stretch;
-        }
-
-        .time-separator {
-            display: none;
-        }
-
-        .placeholder-grid {
-            grid-template-columns: 1fr;
-        }
-
-        .button-group {
-            flex-direction: column;
-        }
+        .button-group { flex-direction: column; }
 
         .btn-save,
-        .btn-reset {
-            width: 100%;
-        }
+        .btn-reset { width: 100%; }
 
         .activity-table th,
-        .activity-table td {
-            padding: 0.75rem 0.5rem;
-            font-size: 0.85rem;
-        }
+        .activity-table td { padding: 0.75rem 0.5rem; font-size: 0.85rem; }
     }
 </style>
 @endsection
@@ -367,143 +297,153 @@
                 </p>
             </div>
 
-            <!-- Configuration Cards -->
-            <div class="content-grid">
-                <!-- Reminder Timing -->
-                <div class="config-card">
-                    <div class="card-title">
-                        <i class="fas fa-clock"></i> Reminder Timing
-                    </div>
+            @if(session('success'))
+                <div style="background:#d4edda;color:#155724;border-radius:0.5rem;padding:0.875rem 1.25rem;margin-bottom:1.5rem;font-weight:500;">
+                    <i class="fas fa-check-circle"></i> {{ session('success') }}
+                </div>
+            @endif
 
-                    <form method="POST" action="{{ route('coordinator.sms-config.store') }}" id="configForm" novalidate>
-                        @csrf
+            @if($errors->any())
+                <div style="background:#f8d7da;color:#721c24;border-radius:0.5rem;padding:0.875rem 1.25rem;margin-bottom:1.5rem;font-weight:500;">
+                    <i class="fas fa-exclamation-circle"></i>
+                    <ul style="margin:0.5rem 0 0 1rem;padding:0;">
+                        @foreach($errors->all() as $error)
+                            <li>{{ $error }}</li>
+                        @endforeach
+                    </ul>
+                </div>
+            @endif
+
+            <form method="POST" action="{{ route('sms.configure.save') }}" id="configForm">
+                @csrf
+
+                <!-- Configuration Cards -->
+                <div class="content-grid">
+                    <!-- Reminder Timing -->
+                    <div class="config-card">
+                        <div class="card-title">
+                            <i class="fas fa-clock"></i> Reminder Timing
+                        </div>
 
                         <div class="form-group">
-                            <label for="hours_before" class="form-label">Hours Before Meeting *</label>
+                            <label for="hours_before" class="form-label">Hours Before Meeting</label>
                             <input
                                 type="number"
                                 class="form-control"
                                 id="hours_before"
                                 name="hours_before"
-                                value="24"
+                                value="{{ old('hours_before', $config->hours_before_meeting) }}"
                                 min="1"
                                 max="72"
                                 required
                             >
-                            <div class="form-text">Send reminder 1-72 hours before meeting</div>
+                            <div class="form-text">Send reminder 1–72 hours before the meeting</div>
                         </div>
 
                         <div class="form-group">
-                            <label for="minutes_buffer" class="form-label">Buffer Time (minutes) *</label>
+                            <label for="minutes_buffer" class="form-label">Buffer Time (minutes)</label>
                             <input
                                 type="number"
                                 class="form-control"
                                 id="minutes_buffer"
                                 name="minutes_buffer"
-                                value="15"
+                                value="{{ old('minutes_buffer', $config->buffer_minutes) }}"
                                 min="0"
                                 max="120"
                                 required
                             >
-                            <div class="form-text">Avoid sending multiple reminders within this window</div>
+                            <div class="form-text">Avoid sending duplicate reminders within this window</div>
                         </div>
-                    </form>
-                </div>
-
-                <!-- Time Window -->
-                <div class="config-card">
-                    <div class="card-title">
-                        <i class="fas fa-calendar-alt"></i> Daytime Window
                     </div>
 
-                    <div class="form-group">
-                        <label for="window_start" class="form-label">Start Time *</label>
-                        <input
-                            type="time"
-                            class="form-control"
-                            id="window_start"
-                            name="window_start"
-                            value="08:00"
-                            required
-                        >
-                        <div class="form-text">Don't send messages before this time</div>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="window_end" class="form-label">End Time *</label>
-                        <input
-                            type="time"
-                            class="form-control"
-                            id="window_end"
-                            name="window_end"
-                            value="21:00"
-                            required
-                        >
-                        <div class="form-text">Don't send messages after this time</div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Message Template Editor -->
-            <div class="template-editor">
-                <div class="editor-title">
-                    <i class="fas fa-edit"></i> SMS Message Template
-                </div>
-
-                <label for="message_template" class="form-label" style="margin-top: 1rem;">
-                    Message Template *
-                </label>
-                <textarea
-                    id="message_template"
-                    name="message_template"
-                    class="editor-textarea"
-                    placeholder="Enter your SMS template here..."
-                    required
-                >Hi {volunteer_first_name}, this is a reminder about your volunteer meeting at {facility_name} on {meeting_date} at {meeting_time}. Please reply CONFIRM or DECLINE. Thank you!</textarea>
-
-                <div class="character-count">
-                    <span id="charCount">0</span> / 160 characters
-                </div>
-
-                <div class="placeholder-list">
-                    <div class="placeholder-title">Available Placeholders</div>
-                    <div class="placeholder-grid">
-                        <div class="placeholder-item" onclick="insertPlaceholder('volunteer_first_name')">
-                            <div class="placeholder-code">{volunteer_first_name}</div>
-                            <div class="placeholder-desc">Volunteer's first name</div>
+                    <!-- Daytime Window -->
+                    <div class="config-card">
+                        <div class="card-title">
+                            <i class="fas fa-calendar-alt"></i> Daytime Window
                         </div>
-                        <div class="placeholder-item" onclick="insertPlaceholder('volunteer_last_name')">
-                            <div class="placeholder-code">{volunteer_last_name}</div>
-                            <div class="placeholder-desc">Volunteer's last name</div>
+
+                        <div class="form-group">
+                            <label for="window_start" class="form-label">Start Time</label>
+                            <input
+                                type="time"
+                                class="form-control"
+                                id="window_start"
+                                name="window_start"
+                                value="{{ old('window_start', $config->window_start) }}"
+                                required
+                            >
+                            <div class="form-text">Don't send messages before this time</div>
                         </div>
-                        <div class="placeholder-item" onclick="insertPlaceholder('facility_name')">
-                            <div class="placeholder-code">{facility_name}</div>
-                            <div class="placeholder-desc">Meeting facility name</div>
-                        </div>
-                        <div class="placeholder-item" onclick="insertPlaceholder('meeting_date')">
-                            <div class="placeholder-code">{meeting_date}</div>
-                            <div class="placeholder-desc">Meeting date</div>
-                        </div>
-                        <div class="placeholder-item" onclick="insertPlaceholder('meeting_time')">
-                            <div class="placeholder-code">{meeting_time}</div>
-                            <div class="placeholder-desc">Meeting time</div>
-                        </div>
-                        <div class="placeholder-item" onclick="insertPlaceholder('facility_address')">
-                            <div class="placeholder-code">{facility_address}</div>
-                            <div class="placeholder-desc">Facility address</div>
+
+                        <div class="form-group">
+                            <label for="window_end" class="form-label">End Time</label>
+                            <input
+                                type="time"
+                                class="form-control"
+                                id="window_end"
+                                name="window_end"
+                                value="{{ old('window_end', $config->window_end) }}"
+                                required
+                            >
+                            <div class="form-text">Don't send messages after this time</div>
                         </div>
                     </div>
                 </div>
 
-                <div class="button-group" style="margin-top: 1.5rem;">
-                    <button type="submit" form="configForm" class="btn-save">
-                        <i class="fas fa-save"></i> Save Configuration
-                    </button>
-                    <button type="reset" form="configForm" class="btn-reset">
-                        <i class="fas fa-redo"></i> Reset
-                    </button>
+                <!-- Message Template Editor -->
+                <div class="template-editor">
+                    <div class="editor-title">
+                        <i class="fas fa-edit"></i> SMS Message Template
+                    </div>
+
+                    <label for="message_template" class="form-label" style="margin-top: 1rem;">
+                        Message Template
+                    </label>
+                    <textarea
+                        id="message_template"
+                        name="message_template"
+                        class="editor-textarea"
+                        placeholder="Enter your SMS template here..."
+                        required
+                    >{{ old('message_template', $config->message_template) }}</textarea>
+
+                    <div class="character-count">
+                        <span id="charCount">0</span> / 160 characters
+                    </div>
+
+                    <div class="placeholder-list">
+                        <div class="placeholder-title">Available Placeholders</div>
+                        <div class="placeholder-grid">
+                            <div class="placeholder-item" onclick="insertPlaceholder('facility_name')">
+                                <div class="placeholder-code">{facility_name}</div>
+                                <div class="placeholder-desc">Meeting facility name</div>
+                            </div>
+                            <div class="placeholder-item" onclick="insertPlaceholder('meeting_date')">
+                                <div class="placeholder-code">{meeting_date}</div>
+                                <div class="placeholder-desc">Meeting date</div>
+                            </div>
+                            <div class="placeholder-item" onclick="insertPlaceholder('meeting_time')">
+                                <div class="placeholder-code">{meeting_time}</div>
+                                <div class="placeholder-desc">Meeting time</div>
+                            </div>
+                            <div class="placeholder-item" onclick="insertPlaceholder('facility_address')">
+                                <div class="placeholder-code">{facility_address}</div>
+                                <div class="placeholder-desc">Facility address</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="button-group">
+                        <button type="submit" class="btn-save">
+                            <i class="fas fa-save"></i> Save Configuration
+                        </button>
+                        <button type="reset" class="btn-reset">
+                            <i class="fas fa-redo"></i> Reset
+                        </button>
+                    </div>
                 </div>
-            </div>
+
+            </form>
 
             <!-- Recent SMS Activity -->
             <div class="activity-section">
@@ -515,67 +455,22 @@
                     <table class="activity-table">
                         <thead>
                             <tr>
-                                <th>Volunteer</th>
                                 <th>Meeting</th>
-                                <th>Send Date</th>
-                                <th>Status</th>
-                                <th>Response</th>
+                                <th>Sent</th>
+                                <th>Message</th>
                             </tr>
                         </thead>
                         <tbody>
                             <tr>
-                                <td><strong>Alex Johnson</strong></td>
-                                <td>Harmony House - Tue, Apr 2 6:30 PM</td>
-                                <td>Apr 1, 2026 3:45 PM</td>
-                                <td><span class="status-badge status-delivered">Delivered</span></td>
-                                <td>CONFIRM</td>
-                            </tr>
-                            <tr>
-                                <td><strong>Morgan Davis</strong></td>
-                                <td>New Path - Wed, Apr 3 7:00 PM</td>
-                                <td>Apr 2, 2026 4:20 PM</td>
-                                <td><span class="status-badge status-sent">Sent</span></td>
-                                <td>Awaiting response</td>
-                            </tr>
-                            <tr>
-                                <td><strong>Jordan Taylor</strong></td>
-                                <td>Sunrise - Thu, Apr 4 5:00 PM</td>
-                                <td>Apr 3, 2026 2:15 PM</td>
-                                <td><span class="status-badge status-delivered">Delivered</span></td>
-                                <td>DECLINE</td>
-                            </tr>
-                            <tr>
-                                <td><strong>Casey Miller</strong></td>
-                                <td>Recovery Plus - Fri, Apr 5 6:00 PM</td>
-                                <td>Apr 4, 2026 5:30 PM</td>
-                                <td><span class="status-badge status-sent">Sent</span></td>
-                                <td>Awaiting response</td>
-                            </tr>
-                            <tr>
-                                <td><strong>Riley Thompson</strong></td>
-                                <td>Harmony House - Sat, Apr 6 5:00 PM</td>
-                                <td>Apr 5, 2026 3:00 PM</td>
-                                <td><span class="status-badge status-failed">Failed</span></td>
-                                <td>Invalid number</td>
-                            </tr>
-                            <tr>
-                                <td><strong>Sam Anderson</strong></td>
-                                <td>New Path - Sun, Apr 7 7:00 PM</td>
-                                <td>Apr 5, 2026 4:45 PM</td>
-                                <td><span class="status-badge status-pending">Pending</span></td>
-                                <td>Scheduled</td>
-                            </tr>
-                            <tr>
-                                <td><strong>Taylor Jackson</strong></td>
-                                <td>Sunrise - Mon, Apr 8 6:00 PM</td>
-                                <td>Mar 31, 2026 2:30 PM</td>
-                                <td><span class="status-badge status-delivered">Delivered</span></td>
-                                <td>CONFIRM</td>
+                                <td colspan="3" style="text-align:center;color:#999;padding:2rem;">
+                                    SMS activity log coming soon.
+                                </td>
                             </tr>
                         </tbody>
                     </table>
                 </div>
             </div>
+
         </div>
     </div>
 </div>
@@ -583,68 +478,31 @@
 
 @section('extra-scripts')
 <script>
-    // Character counter
     const templateTextarea = document.getElementById('message_template');
     const charCount = document.getElementById('charCount');
 
-    templateTextarea.addEventListener('input', function() {
-        charCount.textContent = this.value.length;
-
-        if (this.value.length > 160) {
-            charCount.parentElement.classList.add('error');
-            charCount.parentElement.classList.remove('warning');
-        } else if (this.value.length > 140) {
-            charCount.parentElement.classList.add('warning');
-            charCount.parentElement.classList.remove('error');
-        } else {
-            charCount.parentElement.classList.remove('warning', 'error');
-        }
-    });
-
-    // Initialize character count
-    charCount.textContent = templateTextarea.value.length;
-
-    // Insert placeholder
-    function insertPlaceholder(placeholder) {
-        const textarea = document.getElementById('message_template');
-        const cursorPos = textarea.selectionStart;
-        const beforeText = textarea.value.substring(0, cursorPos);
-        const afterText = textarea.value.substring(cursorPos);
-
-        const placeholderText = '{' + placeholder + '}';
-        textarea.value = beforeText + placeholderText + afterText;
-
-        // Update character count
-        charCount.textContent = textarea.value.length;
-        if (textarea.value.length > 160) {
-            charCount.parentElement.classList.add('error');
-        }
-
-        // Focus back to textarea
-        textarea.focus();
-        textarea.selectionStart = cursorPos + placeholderText.length;
-        textarea.selectionEnd = cursorPos + placeholderText.length;
+    function updateCharCount() {
+        const len = templateTextarea.value.length;
+        charCount.textContent = len;
+        charCount.parentElement.classList.remove('warning', 'error');
+        if (len > 160) charCount.parentElement.classList.add('error');
+        else if (len > 140) charCount.parentElement.classList.add('warning');
     }
 
-    // Form submission
-    document.getElementById('configForm').addEventListener('submit', function(e) {
-        e.preventDefault();
+    templateTextarea.addEventListener('input', updateCharCount);
+    updateCharCount();
 
-        const hoursefore = document.getElementById('hours_before').value;
-        const windowStart = document.getElementById('window_start').value;
-        const windowEnd = document.getElementById('window_end').value;
-        const messageTemplate = document.getElementById('message_template').value;
+    function insertPlaceholder(placeholder) {
+        const pos    = templateTextarea.selectionStart;
+        const text   = '{' + placeholder + '}';
+        const before = templateTextarea.value.substring(0, pos);
+        const after  = templateTextarea.value.substring(pos);
 
-        if (!hoursefore || !windowStart || !windowEnd || !messageTemplate) {
-            alert('Please fill in all required fields.');
-            return;
-        }
-
-        if (messageTemplate.length > 160) {
-            alert('Message template exceeds 160 characters. SMS may be split into multiple messages.');
-        }
-
-        alert('SMS Configuration saved successfully!');
-    });
+        templateTextarea.value = before + text + after;
+        templateTextarea.focus();
+        templateTextarea.selectionStart = pos + text.length;
+        templateTextarea.selectionEnd   = pos + text.length;
+        updateCharCount();
+    }
 </script>
 @endsection

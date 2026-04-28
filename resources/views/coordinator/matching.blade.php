@@ -545,9 +545,14 @@
                     $days  = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
                     $weeks = ['1st','2nd','3rd','4th','Last'];
 
-                    // Compute next occurrence from recurring pattern
+                    // Compute next occurrence date
                     $nextDate = null;
-                    if ($meeting->day_of_week !== null && $meeting->week_of_month !== null && $meeting->meeting_time) {
+                    if ($meeting->scheduled_time) {
+                        $dt = \Carbon\Carbon::parse($meeting->scheduled_time);
+                        if ($dt->isFuture()) {
+                            $nextDate = $dt;
+                        }
+                    } elseif ($meeting->day_of_week !== null && $meeting->week_of_month !== null && $meeting->meeting_time) {
                         $targetDow  = (int) $meeting->day_of_week;
                         $targetWeek = (int) $meeting->week_of_month;
                         [$h, $m]    = explode(':', $meeting->meeting_time);
@@ -673,6 +678,18 @@
                                             {{ $statusIcon }}
                                         </div>
                                     </div>
+                                    @if($assignment->status === 'pending_confirmation')
+                                        <form method="POST"
+                                              action="{{ route('meeting-assignments.confirm', $assignment) }}"
+                                              onsubmit="return confirm('Mark {{ $assignment->volunteer->first_name }} as confirmed?');">
+                                            @csrf
+                                            <button type="submit"
+                                                    style="padding:0.3rem 0.6rem;background:#28a745;color:white;border:none;border-radius:0.4rem;font-size:0.75rem;cursor:pointer;"
+                                                    title="Confirm assignment">
+                                                <i class="fas fa-check"></i>
+                                            </button>
+                                        </form>
+                                    @endif
                                     <form method="POST"
                                           action="{{ route('meeting-assignments.cancel', $assignment) }}"
                                           onsubmit="return confirm('Cancel {{ $assignment->volunteer->first_name }}\'s assignment?');">
@@ -686,6 +703,19 @@
                                 </div>
                                 @endforeach
                             </div>
+
+                            @if($upcomingAssignments->where('status', 'confirmed')->count() > 0)
+                                <form method="POST"
+                                      action="{{ route('meetings.send-reminder', $meeting) }}"
+                                      onsubmit="return confirm('Send reminder to all confirmed volunteers for this meeting?');"
+                                      style="margin-top:0.5rem;">
+                                    @csrf
+                                    <button type="submit"
+                                            style="padding:0.4rem 0.9rem;background:#0099cc;color:white;border:none;border-radius:0.5rem;font-size:0.8rem;font-weight:600;cursor:pointer;">
+                                        <i class="fas fa-bell"></i> Send Reminder
+                                    </button>
+                                </form>
+                            @endif
                         @endif
 
                         {{-- Show assign controls if spots remain --}}
@@ -767,17 +797,7 @@
                 </select>
             </div>
 
-            <div style="margin-bottom:1.25rem;">
-                <label style="display:block;font-weight:600;color:#333;margin-bottom:0.4rem;font-size:0.875rem;">
-                    Assignment Date *
-                </label>
-                <input type="date" id="modalAssignDate" name="assignment_date" required
-                       min="{{ now()->toDateString() }}"
-                       style="width:100%;padding:0.75rem;border:1px solid #ddd;border-radius:0.5rem;font-size:0.9rem;">
-                <p style="font-size:0.78rem;color:#888;margin-top:0.35rem;">
-                    Pre-filled with the next computed occurrence — adjust if needed.
-                </p>
-            </div>
+            <input type="hidden" id="modalAssignDate" name="assignment_date">
 
             <div style="margin-bottom:1.5rem;">
                 <label style="display:block;font-weight:600;color:#333;margin-bottom:0.4rem;font-size:0.875rem;">

@@ -37,14 +37,6 @@ Route::middleware('guest')->group(function () {
 
 /*
 |--------------------------------------------------------------------------
-| SMS Webhook (Unauthenticated)
-|--------------------------------------------------------------------------
-*/
-
-Route::post('/sms/webhook/response', [SmsController::class, 'handleResponse'])->name('sms.webhook');
-
-/*
-|--------------------------------------------------------------------------
 | Authenticated Routes
 |--------------------------------------------------------------------------
 */
@@ -180,6 +172,15 @@ Route::middleware(['auth', 'session_timeout'])->group(function () {
         Route::post('/meetings', [MeetingController::class, 'store'])
             ->name('meetings.store');
 
+        Route::get('/meetings/remindable', [MeetingController::class, 'remindable'])
+            ->name('meetings.remindable');
+
+        Route::get('/meetings/{meeting}/edit', [MeetingController::class, 'edit'])
+            ->name('meetings.edit');
+
+        Route::put('/meetings/{meeting}', [MeetingController::class, 'update'])
+            ->name('meetings.update');
+
         Route::get('/meetings/{meeting}', [MeetingController::class, 'show'])
             ->name('meetings.show');
 
@@ -277,7 +278,7 @@ Route::middleware(['auth', 'session_timeout'])->group(function () {
         Route::get('/sms/configure', [SmsController::class, 'configure'])
             ->name('sms.configure');
 
-        Route::post('/sms/configure', [SmsController::class, 'configure'])
+        Route::post('/sms/configure', [SmsController::class, 'store'])
             ->name('sms.configure.save');
 
         Route::post('/sms/retry-failed', [SmsController::class, 'retryFailed'])
@@ -352,7 +353,7 @@ Route::fallback(function () {
 |
 */
 Route::redirect('/coordinator/dashboard', '/')->name('coordinator.dashboard');
-Route::redirect('/coordinator/matching', '/meetings')->name('coordinator.matching');
+Route::middleware(['auth', 'role:coordinator,admin'])->get('/coordinator/matching', [MeetingController::class, 'matching'])->name('coordinator.matching');
 Route::redirect('/coordinator/facilities', '/facilities')->name('coordinator.facilities');
 Route::redirect('/coordinator/volunteers', '/volunteers')->name('coordinator.volunteers');
 Route::redirect('/coordinator/coordinators', '/coordinators')->name('coordinator.coordinators');
