@@ -10,237 +10,127 @@ class UserSeeder extends Seeder
 {
     /**
      * Seed the users table.
+     *
+     * Staff accounts (non-volunteer):
+     *   admin@example.com         — admin + coordinator
+     *   coord@example.com         — coordinator
+     *   kevin.harris@example.com  — coordinator
+     *   nicole.clark@example.com  — coordinator
+     *   brian.lewis@example.com   — coordinator
+     *   rachel.walker@example.com — coordinator
+     *
+     * Volunteer accounts (30 total across 4 clean-time groups):
+     *   Group 1 — 5 volunteers  (3 days – 6 months clean)
+     *   Group 2 — 5 volunteers  (6 months – 2 years clean)
+     *   Group 3 — 10 volunteers (2 – 5 years clean)
+     *   Group 4 — 10 volunteers (5 – 30 years clean)
+     *
+     * Dual-role (volunteer + coordinator):
+     *   steven.young@example.com, stephanie.king@example.com  (Group 3)
      */
     public function run(): void
     {
-        // Admin user
+        // ── Admin ────────────────────────────────────────────
         User::create([
-            'email' => 'admin@example.com',
-            'password_hash' => Hash::make('AdminPass123!'),
+            'email'             => 'admin@example.com',
+            'password_hash'     => Hash::make('AdminPass123!'),
             'email_verified_at' => now(),
-            'roles' => ['admin', 'coordinator'],
+            'roles'             => ['admin', 'coordinator'],
         ]);
 
-        // Coordinator user
-        User::create([
-            'email' => 'coord@example.com',
-            'password_hash' => Hash::make('CoordPass123!'),
-            'email_verified_at' => now(),
-            'roles' => ['coordinator'],
-        ]);
+        // ── Coordinators ─────────────────────────────────────
+        foreach ([
+            ['coord@example.com',         'CoordPass123!'],
+            ['kevin.harris@example.com',  'password123'],
+            ['nicole.clark@example.com',  'password123'],
+            ['brian.lewis@example.com',   'password123'],
+            ['rachel.walker@example.com', 'password123'],
+        ] as [$email, $pass]) {
+            User::create([
+                'email'             => $email,
+                'password_hash'     => Hash::make($pass),
+                'email_verified_at' => now(),
+                'roles'             => ['coordinator'],
+            ]);
+        }
 
-        // John Smith - volunteer
-        User::create([
-            'email' => 'john@example.com',
-            'password_hash' => Hash::make('SecurePass123!'),
-            'email_verified_at' => now(),
-            'roles' => ['volunteer'],
-        ]);
+        // ── Group 1 — 5 volunteers (3 days – 6 months clean) ─
+        foreach ([
+            'tyler.bennett@example.com',
+            'kayla.foster@example.com',
+            'devon.reyes@example.com',
+            'brittney.cole@example.com',
+            'anthony.price@example.com',
+        ] as $email) {
+            User::create([
+                'email'             => $email,
+                'password_hash'     => Hash::make('password123'),
+                'email_verified_at' => now(),
+                'roles'             => ['volunteer'],
+            ]);
+        }
 
-        // Sarah Johnson - volunteer
-        User::create([
-            'email' => 'sarah@example.com',
-            'password_hash' => Hash::make('password123'),
-            'email_verified_at' => now(),
-            'roles' => ['volunteer'],
-        ]);
+        // ── Group 2 — 5 volunteers (6 months – 2 years clean) ─
+        foreach ([
+            'david.anderson@example.com',
+            'jennifer.white@example.com',
+            'christopher.miller@example.com',
+            'michelle.taylor@example.com',
+            'daniel.thomas@example.com',
+        ] as $email) {
+            User::create([
+                'email'             => $email,
+                'password_hash'     => Hash::make('password123'),
+                'email_verified_at' => now(),
+                'roles'             => ['volunteer'],
+            ]);
+        }
 
-        // Marcus Williams - volunteer
-        User::create([
-            'email' => 'marcus@example.com',
-            'password_hash' => Hash::make('password123'),
-            'email_verified_at' => now(),
-            'roles' => ['volunteer'],
-        ]);
+        // ── Group 3 — 10 volunteers (2 – 5 years clean) ──────
+        $group3Emails = [
+            'jessica.moore@example.com',
+            'matthew.jackson@example.com',
+            'ashley.martin@example.com',
+            'ryan.lee@example.com',
+            'lauren.perez@example.com',
+            'steven.young@example.com',    // dual-role
+            'stephanie.king@example.com',  // dual-role
+            'marcus.webb@example.com',
+            'tanya.owens@example.com',
+            'raymond.cruz@example.com',
+        ];
+        $dualRole = ['steven.young@example.com', 'stephanie.king@example.com'];
 
-        // Emily Chen - volunteer
-        User::create([
-            'email' => 'emily@example.com',
-            'password_hash' => Hash::make('password123'),
-            'email_verified_at' => now(),
-            'roles' => ['volunteer'],
-        ]);
+        foreach ($group3Emails as $email) {
+            User::create([
+                'email'             => $email,
+                'password_hash'     => Hash::make('password123'),
+                'email_verified_at' => now(),
+                'roles'             => in_array($email, $dualRole)
+                                        ? ['volunteer', 'coordinator']
+                                        : ['volunteer'],
+            ]);
+        }
 
-        // Robert Davis - volunteer
-        User::create([
-            'email' => 'robert@example.com',
-            'password_hash' => Hash::make('password123'),
-            'email_verified_at' => now(),
-            'roles' => ['volunteer'],
-        ]);
-
-        // Lisa Martinez - volunteer
-        User::create([
-            'email' => 'lisa@example.com',
-            'password_hash' => Hash::make('password123'),
-            'email_verified_at' => now(),
-            'roles' => ['volunteer'],
-        ]);
-
-        // James Wilson - volunteer
-        User::create([
-            'email' => 'james@example.com',
-            'password_hash' => Hash::make('password123'),
-            'email_verified_at' => now(),
-            'roles' => ['volunteer'],
-        ]);
-
-        // Amanda Thompson - volunteer
-        User::create([
-            'email' => 'amanda@example.com',
-            'password_hash' => Hash::make('password123'),
-            'email_verified_at' => now(),
-            'roles' => ['volunteer'],
-        ]);
-
-        // Carlos Garcia - volunteer
-        User::create([
-            'email' => 'carlos@example.com',
-            'password_hash' => Hash::make('password123'),
-            'email_verified_at' => now(),
-            'roles' => ['volunteer'],
-        ]);
-
-        // Patricia Brown - volunteer
-        User::create([
-            'email' => 'patricia@example.com',
-            'password_hash' => Hash::make('password123'),
-            'email_verified_at' => now(),
-            'roles' => ['volunteer'],
-        ]);
-
-        // ===== ADDITIONAL VOLUNTEERS (10) =====
-
-        // David Anderson - volunteer
-        User::create([
-            'email' => 'david.anderson@example.com',
-            'password_hash' => Hash::make('password123'),
-            'email_verified_at' => now(),
-            'roles' => ['volunteer'],
-        ]);
-
-        // Jennifer White - volunteer
-        User::create([
-            'email' => 'jennifer.white@example.com',
-            'password_hash' => Hash::make('password123'),
-            'email_verified_at' => now(),
-            'roles' => ['volunteer'],
-        ]);
-
-        // Christopher Miller - volunteer
-        User::create([
-            'email' => 'christopher.miller@example.com',
-            'password_hash' => Hash::make('password123'),
-            'email_verified_at' => now(),
-            'roles' => ['volunteer'],
-        ]);
-
-        // Michelle Taylor - volunteer
-        User::create([
-            'email' => 'michelle.taylor@example.com',
-            'password_hash' => Hash::make('password123'),
-            'email_verified_at' => now(),
-            'roles' => ['volunteer'],
-        ]);
-
-        // Daniel Thomas - volunteer
-        User::create([
-            'email' => 'daniel.thomas@example.com',
-            'password_hash' => Hash::make('password123'),
-            'email_verified_at' => now(),
-            'roles' => ['volunteer'],
-        ]);
-
-        // Jessica Moore - volunteer
-        User::create([
-            'email' => 'jessica.moore@example.com',
-            'password_hash' => Hash::make('password123'),
-            'email_verified_at' => now(),
-            'roles' => ['volunteer'],
-        ]);
-
-        // Matthew Jackson - volunteer
-        User::create([
-            'email' => 'matthew.jackson@example.com',
-            'password_hash' => Hash::make('password123'),
-            'email_verified_at' => now(),
-            'roles' => ['volunteer'],
-        ]);
-
-        // Ashley Martin - volunteer
-        User::create([
-            'email' => 'ashley.martin@example.com',
-            'password_hash' => Hash::make('password123'),
-            'email_verified_at' => now(),
-            'roles' => ['volunteer'],
-        ]);
-
-        // Ryan Lee - volunteer
-        User::create([
-            'email' => 'ryan.lee@example.com',
-            'password_hash' => Hash::make('password123'),
-            'email_verified_at' => now(),
-            'roles' => ['volunteer'],
-        ]);
-
-        // Lauren Perez - volunteer
-        User::create([
-            'email' => 'lauren.perez@example.com',
-            'password_hash' => Hash::make('password123'),
-            'email_verified_at' => now(),
-            'roles' => ['volunteer'],
-        ]);
-
-        // ===== ADDITIONAL COORDINATORS (4) =====
-
-        // Kevin Harris - coordinator
-        User::create([
-            'email' => 'kevin.harris@example.com',
-            'password_hash' => Hash::make('password123'),
-            'email_verified_at' => now(),
-            'roles' => ['coordinator'],
-        ]);
-
-        // Nicole Clark - coordinator
-        User::create([
-            'email' => 'nicole.clark@example.com',
-            'password_hash' => Hash::make('password123'),
-            'email_verified_at' => now(),
-            'roles' => ['coordinator'],
-        ]);
-
-        // Brian Lewis - coordinator
-        User::create([
-            'email' => 'brian.lewis@example.com',
-            'password_hash' => Hash::make('password123'),
-            'email_verified_at' => now(),
-            'roles' => ['coordinator'],
-        ]);
-
-        // Rachel Walker - coordinator
-        User::create([
-            'email' => 'rachel.walker@example.com',
-            'password_hash' => Hash::make('password123'),
-            'email_verified_at' => now(),
-            'roles' => ['coordinator'],
-        ]);
-
-        // ===== DUAL-ROLE USERS (Volunteer + Coordinator) (2) =====
-
-        // Steven Young - volunteer + coordinator
-        User::create([
-            'email' => 'steven.young@example.com',
-            'password_hash' => Hash::make('password123'),
-            'email_verified_at' => now(),
-            'roles' => ['volunteer', 'coordinator'],
-        ]);
-
-        // Stephanie King - volunteer + coordinator
-        User::create([
-            'email' => 'stephanie.king@example.com',
-            'password_hash' => Hash::make('password123'),
-            'email_verified_at' => now(),
-            'roles' => ['volunteer', 'coordinator'],
-        ]);
+        // ── Group 4 — 10 volunteers (5 – 30 years clean) ─────
+        foreach ([
+            'john@example.com',
+            'sarah@example.com',
+            'marcus@example.com',
+            'emily@example.com',
+            'robert@example.com',
+            'lisa@example.com',
+            'james@example.com',
+            'amanda@example.com',
+            'carlos@example.com',
+            'patricia@example.com',
+        ] as $email) {
+            User::create([
+                'email'             => $email,
+                'password_hash'     => Hash::make('password123'),
+                'email_verified_at' => now(),
+                'roles'             => ['volunteer'],
+            ]);
+        }
     }
 }
