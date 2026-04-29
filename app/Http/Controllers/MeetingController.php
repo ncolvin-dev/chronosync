@@ -45,13 +45,27 @@ class MeetingController extends Controller
     {
         $this->authorizeCoordinatorOrAdmin();
 
-        $meetings = Meeting::with('facility')
-            ->withoutTrashed()
-            ->orderBy('status')
-            ->orderBy('day_of_week')
-            ->orderBy('week_of_month')
-            ->orderBy('meeting_time')
-            ->paginate(20);
+        // Sorting
+        $sortable = ['facility_name', 'schedule', 'status'];
+        $sort = in_array($request->sort, $sortable) ? $request->sort : 'schedule';
+        $dir  = $request->dir === 'desc' ? 'desc' : 'asc';
+
+        $query = Meeting::with('facility')->withoutTrashed();
+
+        if ($sort === 'facility_name') {
+            $query->join('facilities', 'meetings.facility_id', '=', 'facilities.facility_id')
+                  ->select('meetings.*')
+                  ->orderBy('facilities.facility_name', $dir);
+        } elseif ($sort === 'status') {
+            $query->orderBy('status', $dir);
+        } else {
+            // 'schedule' — composite sort
+            $query->orderBy('day_of_week', $dir)
+                  ->orderBy('week_of_month', $dir)
+                  ->orderBy('meeting_time', $dir);
+        }
+
+        $meetings = $query->paginate(20);
 
         $facilities = Facility::where('status', 'active')
             ->orderBy('facility_name')
@@ -68,7 +82,7 @@ class MeetingController extends Controller
             ->orderBy('week_of_month')
             ->get();
 
-        return view('coordinator.meetings', compact('meetings', 'facilities', 'remindableMeetings'));
+        return view('coordinator.meetings', compact('meetings', 'facilities', 'remindableMeetings', 'sort', 'dir'));
     }
 
     /**
@@ -77,6 +91,11 @@ class MeetingController extends Controller
     public function matching(Request $request)
     {
         $this->authorizeCoordinatorOrAdmin();
+
+        // Sorting
+        $sortable = ['facility_name', 'schedule', 'next_occurrence'];
+        $sort = in_array($request->sort, $sortable) ? $request->sort : 'schedule';
+        $dir  = $request->dir === 'desc' ? 'desc' : 'asc';
 
         $query = Meeting::with('facility')->withoutTrashed();
 
@@ -101,11 +120,39 @@ class MeetingController extends Controller
             $this->applyAssignmentStatusFilter($query, $request->assignment_status, $today);
         }
 
-        $meetings = $query
-            ->orderBy('day_of_week')
-            ->orderBy('week_of_month')
-            ->orderBy('meeting_time')
-            ->paginate(15);
+        if ($sort === 'next_occurrence') {
+            // Compute next occurrence in PHP, then re-paginate
+            $all = $query->get();
+            $mapped = $all->map(function ($m) {
+                $m->_nextTs = $m->nextOccurrence()?->timestamp ?? PHP_INT_MAX;
+                return $m;
+            });
+            $sorted = $dir === 'desc'
+                ? $mapped->sortByDesc('_nextTs')->values()
+                : $mapped->sortBy('_nextTs')->values();
+
+            $perPage = 15;
+            $page    = (int) $request->input('page', 1);
+            $slice   = $sorted->slice(($page - 1) * $perPage, $perPage)->values();
+
+            $meetings = new \Illuminate\Pagination\LengthAwarePaginator(
+                $slice, $sorted->count(), $perPage, $page,
+                ['path' => $request->url(), 'query' => $request->query()]
+            );
+        } elseif ($sort === 'facility_name') {
+            $meetings = $query
+                ->join('facilities', 'meetings.facility_id', '=', 'facilities.facility_id')
+                ->select('meetings.*')
+                ->orderBy('facilities.facility_name', $dir)
+                ->paginate(15);
+        } else {
+            // 'schedule' — composite sort
+            $meetings = $query
+                ->orderBy('day_of_week', $dir)
+                ->orderBy('week_of_month', $dir)
+                ->orderBy('meeting_time', $dir)
+                ->paginate(15);
+        }
 
         $facilities = Facility::where('status', 'active')
             ->orderBy('facility_name')
@@ -116,7 +163,7 @@ class MeetingController extends Controller
             ->orderBy('first_name')
             ->get(['volunteer_id', 'first_name', 'last_name']);
 
-        return view('coordinator.matching', compact('meetings', 'facilities', 'volunteers'));
+        return view('coordinator.matching', compact('meetings', 'facilities', 'volunteers', 'sort', 'dir'));
     }
 
     /**
@@ -174,7 +221,11 @@ class MeetingController extends Controller
             ]);
 
             // Create the SNS topic for this meeting slot so it is ready for subscriptions.
-            $this->snsService->ensureTopicExists($meeting);
+            try {
+                $this->snsService->ensureTopicExists($meeting);
+            } catch (\Throwable $e) {
+                \Log::warning('SNS topic creation failed (non-fatal): ' . $e->getMessage(), ['meeting_id' => $meeting->meeting_id]);
+            }
 
             return redirect()->route('meetings.index')
                 ->with('success', 'Meeting created successfully.');
@@ -282,7 +333,11 @@ class MeetingController extends Controller
                     SendSmsJob::dispatch($a, 'confirmation_request');
                 }
 
-                $this->snsService->syncSubscriptions($sibling);
+                try {
+                    $this->snsService->syncSubscriptions($sibling);
+                } catch (\Throwable $e) {
+                    \Log::warning('SNS sync failed (non-fatal): ' . $e->getMessage(), ['meeting_id' => $sibling->meeting_id]);
+                }
                 $assigned++;
             }
 
@@ -352,7 +407,11 @@ class MeetingController extends Controller
             SendSmsJob::dispatch($assignment, 'confirmation_request');
         }
 
-        $this->snsService->syncSubscriptions($meeting);
+        try {
+            $this->snsService->syncSubscriptions($meeting);
+        } catch (\Throwable $e) {
+            \Log::warning('SNS sync failed (non-fatal): ' . $e->getMessage(), ['meeting_id' => $meeting->meeting_id]);
+        }
 
         return back()->with('success', 'Volunteer assigned and confirmation request sent.');
     }
@@ -459,7 +518,11 @@ class MeetingController extends Controller
 
         // Remove the cancelled volunteer from the SNS topic.
         if ($meetingAssignment->meeting) {
-            $this->snsService->syncSubscriptions($meetingAssignment->meeting);
+            try {
+                $this->snsService->syncSubscriptions($meetingAssignment->meeting);
+            } catch (\Throwable $e) {
+                \Log::warning('SNS sync failed (non-fatal): ' . $e->getMessage(), ['meeting_id' => $meetingAssignment->meeting->meeting_id]);
+            }
         }
 
         if ($request->expectsJson()) {

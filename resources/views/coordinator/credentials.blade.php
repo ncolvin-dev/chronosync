@@ -104,6 +104,14 @@
         white-space: nowrap;
     }
 
+    /* Sort headers */
+    .sort-link { color: inherit; text-decoration: none; display: inline-flex; align-items: center; gap: 0.25rem; white-space: nowrap; }
+    .sort-link:hover { color: #0099cc; }
+    .sort-icon { font-size: 0.7rem; opacity: 0.35; }
+    .sort-icon.active { opacity: 1; color: #0099cc; }
+    html.dark .sort-link:hover { color: #38bdf8; }
+    html.dark .sort-icon.active { color: #38bdf8; }
+
     .table td {
         padding: 1rem;
         border-bottom: 1px solid #e0e0e0;
@@ -709,12 +717,63 @@
                 <table class="table">
                     <thead>
                         <tr>
-                            <th>Volunteer</th>
+                            @php
+                                $mkUrl = fn($col) => route('credentials.index', array_merge(
+                                    request()->except(['sort','dir','page']),
+                                    ['sort'=>$col, 'dir'=>($sort===$col && $dir==='asc') ? 'desc' : 'asc']
+                                ));
+                            @endphp
+                            <th>
+                                <a href="{{ $mkUrl('volunteer_name') }}" class="sort-link">
+                                    Volunteer
+                                    @if($sort === 'volunteer_name')
+                                        <span class="sort-icon active">{{ $dir === 'asc' ? '▲' : '▼' }}</span>
+                                    @else
+                                        <span class="sort-icon">⇅</span>
+                                    @endif
+                                </a>
+                            </th>
                             <th>Facility</th>
-                            <th>Credential Type</th>
-                            <th>Approval Date</th>
-                            <th>Expiration Date</th>
-                            <th>Status</th>
+                            <th>
+                                <a href="{{ $mkUrl('credential_type') }}" class="sort-link">
+                                    Credential Type
+                                    @if($sort === 'credential_type')
+                                        <span class="sort-icon active">{{ $dir === 'asc' ? '▲' : '▼' }}</span>
+                                    @else
+                                        <span class="sort-icon">⇅</span>
+                                    @endif
+                                </a>
+                            </th>
+                            <th>
+                                <a href="{{ $mkUrl('approval_date') }}" class="sort-link">
+                                    Approval Date
+                                    @if($sort === 'approval_date')
+                                        <span class="sort-icon active">{{ $dir === 'asc' ? '▲' : '▼' }}</span>
+                                    @else
+                                        <span class="sort-icon">⇅</span>
+                                    @endif
+                                </a>
+                            </th>
+                            <th>
+                                <a href="{{ $mkUrl('expiration_date') }}" class="sort-link">
+                                    Expiration Date
+                                    @if($sort === 'expiration_date')
+                                        <span class="sort-icon active">{{ $dir === 'asc' ? '▲' : '▼' }}</span>
+                                    @else
+                                        <span class="sort-icon">⇅</span>
+                                    @endif
+                                </a>
+                            </th>
+                            <th>
+                                <a href="{{ $mkUrl('status') }}" class="sort-link">
+                                    Status
+                                    @if($sort === 'status')
+                                        <span class="sort-icon active">{{ $dir === 'asc' ? '▲' : '▼' }}</span>
+                                    @else
+                                        <span class="sort-icon">⇅</span>
+                                    @endif
+                                </a>
+                            </th>
                             <th>Actions</th>
                         </tr>
                     </thead>
