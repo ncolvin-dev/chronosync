@@ -22,6 +22,11 @@ class VolunteerController extends Controller
     {
         $this->authorizeCoordinatorOrAdmin();
 
+        // Sorting
+        $sortable = ['last_name', 'first_name', 'clean_date', 'probation_status'];
+        $sort = in_array($request->sort, $sortable) ? $request->sort : 'last_name';
+        $dir  = $request->dir === 'desc' ? 'desc' : 'asc';
+
         $query = Volunteer::withoutTrashed();
 
         // Search by name or email
@@ -58,9 +63,11 @@ class VolunteerController extends Controller
             ]);
         }
 
-        $volunteers = $query->with(['credentials.credentialType'])->paginate(15);
+        $volunteers = $query->with(['credentials.credentialType'])
+            ->orderBy($sort, $dir)
+            ->paginate(15);
 
-        return view('coordinator.volunteers', compact('volunteers'));
+        return view('coordinator.volunteers', compact('volunteers', 'sort', 'dir'));
     }
 
     /**

@@ -318,13 +318,16 @@ Route::middleware(['auth', 'session_timeout'])->group(function () {
     |----------------------------------------------------------------------
     */
 
+    // Coordinator & Admin: main dashboard (coordinators are redirected here on login)
+    Route::middleware('role:coordinator,admin')->group(function () {
+        Route::get('/admin/dashboard', [DashboardController::class, 'index'])->name('admin.dashboard');
+    });
+
     Route::middleware('role:admin')->group(function () {
         Route::delete('/coordinators/{user}', [CoordinatorController::class, 'destroy'])
             ->name('coordinators.destroy');
 
         // System settings, user management, audit logs, etc.
-        Route::get('/admin/dashboard', [DashboardController::class, 'index'])->name('admin.dashboard');
-
         Route::get('/admin/audit-logs', function () {
             return view('admin.audit-logs');
         })->name('admin.audit-logs');

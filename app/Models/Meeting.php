@@ -117,8 +117,14 @@ class Meeting extends Model
 
     /**
      * Compute the next upcoming occurrence date.
-     * For one-off meetings, returns scheduled_time if it hasn't passed yet.
-     * For recurring meetings, searches the current and next month.
+     *
+     * One-off meetings: returns scheduled_time if it hasn't passed yet.
+     * Every-week meetings (week_of_month = null): returns the next calendar
+     *   date matching day_of_week. If today is the meeting day and the
+     *   meeting time hasn't passed yet, today is returned; otherwise the
+     *   same weekday next week.
+     * Specific-week meetings (week_of_month 1-5): searches current month
+     *   then next month.
      */
     public function nextOccurrence(): ?Carbon
     {
@@ -126,15 +132,55 @@ class Meeting extends Model
             return $this->scheduled_time?->isFuture() ? $this->scheduled_time : null;
         }
 
-        return $this->occurrenceInMonth(now()->year, now()->month)
-            ?? $this->occurrenceInMonth(now()->addMonth()->year, now()->addMonth()->month);
+        // Every-week meetings: find the next upcoming weekday from today.
+        if (is_null($this->week_of_month)) {
+            $today = now()->startOfDay();
+            $diff  = ($this->day_of_week - $today->dayOfWeek + 7) % 7;
+            $candidate = $today->copy()->addDays($diff);
+
+            // If the candidate is today, check whether the meeting time has already passed.
+            if ($diff === 0 && $this->meeting_time) {
+                $meetingDateTime = $today->copy()->setTimeFromTimeString($this->meeting_time);
+                if ($meetingDateTime->lte(now())) {
+                    $candidate->addWeek();
+                }
+            }
+
+            return $candidate;
+        }
+
+        // Specific-week meeting: use the current month's occurrence only when it
+        // hasn't passed yet.  If the occurrence date is today and the meeting time
+        // has already elapsed, treat it as past and fall through to next month.
+        $today     = now()->startOfDay();
+        $thisMonth = $this->occurrenceInMonth(now()->year, now()->month);
+
+        if ($thisMonth && $thisMonth->gte($today)) {
+            // The occurrence is today — additionally verify the meeting time is still ahead.
+            if ($thisMonth->eq($today) && $this->meeting_time) {
+                $meetingDateTime = $thisMonth->copy()->setTimeFromTimeString($this->meeting_time);
+                if ($meetingDateTime->lte(now())) {
+                    return $this->occurrenceInMonth(now()->addMonth()->year, now()->addMonth()->month);
+                }
+            }
+            return $thisMonth;
+        }
+
+        // Current month's occurrence is already past; return next month's.
+        return $this->occurrenceInMonth(now()->addMonth()->year, now()->addMonth()->month);
     }
 
     /**
-     * Compute the occurrence date for a given year/month.
+     * Compute the occurrence date for a specific week-of-month pattern in a given year/month.
+     * Only meaningful when week_of_month is 1–5; returns null for every-week meetings.
      */
     public function occurrenceInMonth(int $year, int $month): ?Carbon
     {
+        // Every-week meetings don't have a single "the" occurrence per month.
+        if (is_null($this->week_of_month)) {
+            return null;
+        }
+
         $target = $this->day_of_week; // 0-6
 
         // Find the first day of the month that matches day_of_week

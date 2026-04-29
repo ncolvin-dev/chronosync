@@ -571,7 +571,7 @@
 
     @yield('extra-scripts')
 
-    <!-- Auto-dismiss success/warning flash messages -->
+    <!-- Auto-dismiss flash messages (success/warning after 3 s, errors after 6 s) -->
     <script>
         document.addEventListener('DOMContentLoaded', function () {
             document.querySelectorAll('.flash-messages .alert-success, .flash-messages .alert-warning').forEach(function (alert) {
@@ -582,6 +582,15 @@
                         bootstrap.Alert.getOrCreateInstance(alert).close();
                     }, 600);
                 }, 3000);
+            });
+            document.querySelectorAll('.flash-messages .alert-danger').forEach(function (alert) {
+                setTimeout(function () {
+                    alert.style.transition = 'opacity 0.6s ease';
+                    alert.style.opacity = '0';
+                    setTimeout(function () {
+                        bootstrap.Alert.getOrCreateInstance(alert).close();
+                    }, 600);
+                }, 6000);
             });
         });
     </script>

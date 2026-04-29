@@ -109,6 +109,14 @@
     .btn-activate { background: #28a745; }
     .btn-delete   { background: #dc3545; }
 
+    /* Sort headers */
+    .sort-link { color: inherit; text-decoration: none; display: inline-flex; align-items: center; gap: 0.25rem; white-space: nowrap; }
+    .sort-link:hover { color: #0099cc; }
+    .sort-icon { font-size: 0.7rem; opacity: 0.35; }
+    .sort-icon.active { opacity: 1; color: #0099cc; }
+    html.dark .sort-link:hover { color: #38bdf8; }
+    html.dark .sort-icon.active { color: #38bdf8; }
+
     /* Reminder section */
     .reminder-row {
         display: flex;
@@ -314,6 +322,24 @@
     html.dark .type-toggle { border-color: #334155; }
     html.dark .type-toggle label { color: #94a3b8; }
 
+    .req-star {
+        color: #dc3545;
+        margin-left: 0.15em;
+        font-weight: 700;
+    }
+
+    .field-error {
+        color: #dc3545;
+        font-size: 0.8rem;
+        margin-top: 0.3rem;
+        display: none;
+    }
+
+    .form-control.is-invalid {
+        border-color: #dc3545;
+        box-shadow: 0 0 0 3px rgba(220,53,69,0.15);
+    }
+
     @media (max-width: 640px) {
         .form-row { grid-template-columns: 1fr; }
         .meetings-table { font-size: 0.8rem; }
@@ -332,25 +358,6 @@
             <i class="fas fa-plus"></i> Add Meeting
         </button>
     </div>
-
-    <!-- Flash messages -->
-    @if(session('success'))
-        <div style="background:#d4edda;color:#155724;padding:0.85rem 1.25rem;border-radius:0.5rem;margin-bottom:1.5rem;border:1px solid #c3e6cb;">
-            <i class="fas fa-check-circle"></i> {{ session('success') }}
-        </div>
-    @endif
-    @if(session('error'))
-        <div style="background:#f8d7da;color:#721c24;padding:0.85rem 1.25rem;border-radius:0.5rem;margin-bottom:1.5rem;border:1px solid #f5c6cb;">
-            <i class="fas fa-exclamation-circle"></i> {{ session('error') }}
-        </div>
-    @endif
-    @if($errors->any())
-        <div style="background:#f8d7da;color:#721c24;padding:0.85rem 1.25rem;border-radius:0.5rem;margin-bottom:1.5rem;border:1px solid #f5c6cb;">
-            @foreach($errors->all() as $error)
-                <div><i class="fas fa-exclamation-circle"></i> {{ $error }}</div>
-            @endforeach
-        </div>
-    @endif
 
     <!-- Send Reminder -->
     <div class="section-card">
@@ -396,12 +403,46 @@
                 <table class="meetings-table">
                     <thead>
                         <tr>
-                            <th>Facility</th>
-                            <th>Schedule</th>
+                            @php
+                                $mkUrl = fn($col) => route('meetings.index', array_merge(
+                                    request()->except(['sort','dir','page']),
+                                    ['sort'=>$col, 'dir'=>($sort===$col && $dir==='asc') ? 'desc' : 'asc']
+                                ));
+                            @endphp
+                            <th>
+                                <a href="{{ $mkUrl('facility_name') }}" class="sort-link">
+                                    Facility
+                                    @if($sort === 'facility_name')
+                                        <span class="sort-icon active">{{ $dir === 'asc' ? '▲' : '▼' }}</span>
+                                    @else
+                                        <span class="sort-icon">⇅</span>
+                                    @endif
+                                </a>
+                            </th>
+                            <th>
+                                <a href="{{ $mkUrl('schedule') }}" class="sort-link">
+                                    Schedule
+                                    @if($sort === 'schedule')
+                                        <span class="sort-icon active">{{ $dir === 'asc' ? '▲' : '▼' }}</span>
+                                    @else
+                                        <span class="sort-icon">⇅</span>
+                                    @endif
+                                </a>
+                            </th>
+                            <th>Next Occurrence</th>
                             <th>Type</th>
                             <th>Format</th>
                             <th style="text-align:center;">Volunteers</th>
-                            <th>Status</th>
+                            <th>
+                                <a href="{{ $mkUrl('status') }}" class="sort-link">
+                                    Status
+                                    @if($sort === 'status')
+                                        <span class="sort-icon active">{{ $dir === 'asc' ? '▲' : '▼' }}</span>
+                                    @else
+                                        <span class="sort-icon">⇅</span>
+                                    @endif
+                                </a>
+                            </th>
                             <th>Actions</th>
                         </tr>
                     </thead>
@@ -412,6 +453,16 @@
                                 {{ $meeting->facility->facility_name ?? '—' }}
                             </td>
                             <td>{{ $meeting->schedule_label }}</td>
+                            <td style="white-space:nowrap;color:#555;font-size:0.875rem;">
+                                @php $next = $meeting->nextOccurrence(); @endphp
+                                @if($next)
+                                    {{ $next->format('D, M j, Y') }}
+                                @elseif($meeting->isOneOff() && $meeting->scheduled_time)
+                                    <span style="color:#aaa;font-style:italic;">Past</span>
+                                @else
+                                    <span style="color:#aaa;">—</span>
+                                @endif
+                            </td>
                             <td>{{ $meeting->isRecurring() ? 'Recurring' : 'One-off' }}</td>
                             <td>{{ ucfirst(str_replace('_', ' ', $meeting->format)) }}</td>
                             <td style="text-align:center;">{{ $meeting->volunteers_needed }}</td>
@@ -463,7 +514,7 @@
 
             @if($meetings->hasPages())
                 <div style="display:flex;justify-content:center;margin-top:1.5rem;">
-                    {{ $meetings->links() }}
+                    {{ $meetings->appends(request()->query())->links() }}
                 </div>
             @endif
         @endif
@@ -498,20 +549,21 @@
 
                 <!-- Facility -->
                 <div class="form-group">
-                    <label for="facility_id" class="form-label">Facility *</label>
-                    <select class="form-control" id="facility_id" name="facility_id" required>
+                    <label for="facility_id" class="form-label">Facility <span class="req-star" aria-hidden="true">*</span></label>
+                    <select class="form-control" id="facility_id" name="facility_id">
                         <option value="">Select a facility…</option>
                         @foreach($facilities as $facility)
                             <option value="{{ $facility->facility_id }}">{{ $facility->facility_name }}</option>
                         @endforeach
                     </select>
+                    <div id="error_facility_id" class="field-error" role="alert" aria-live="polite"></div>
                 </div>
 
                 <!-- Recurring fields -->
                 <div id="recurringFields">
                     <div class="form-row">
                         <div class="form-group">
-                            <label for="week_of_month" class="form-label">Week of Month *</label>
+                            <label for="week_of_month" class="form-label">Week of Month <span class="req-star" aria-hidden="true">*</span></label>
                             <select class="form-control" id="week_of_month" name="week_of_month">
                                 <option value="1">1st</option>
                                 <option value="2">2nd</option>
@@ -521,7 +573,7 @@
                             </select>
                         </div>
                         <div class="form-group">
-                            <label for="day_of_week" class="form-label">Day of Week *</label>
+                            <label for="day_of_week" class="form-label">Day of Week <span class="req-star" aria-hidden="true">*</span></label>
                             <select class="form-control" id="day_of_week" name="day_of_week">
                                 <option value="0">Sunday</option>
                                 <option value="1">Monday</option>
@@ -534,23 +586,25 @@
                         </div>
                     </div>
                     <div class="form-group">
-                        <label for="meeting_time" class="form-label">Meeting Time *</label>
+                        <label for="meeting_time" class="form-label">Meeting Time <span class="req-star" aria-hidden="true">*</span></label>
                         <input type="time" class="form-control" id="meeting_time" name="meeting_time">
+                        <div id="error_meeting_time" class="field-error" role="alert" aria-live="polite"></div>
                     </div>
                 </div>
 
                 <!-- One-off fields -->
                 <div id="oneOffFields" style="display:none;">
                     <div class="form-group">
-                        <label for="scheduled_time" class="form-label">Date &amp; Time *</label>
+                        <label for="scheduled_time" class="form-label">Date &amp; Time <span class="req-star" aria-hidden="true">*</span></label>
                         <input type="datetime-local" class="form-control" id="scheduled_time" name="scheduled_time">
+                        <div id="error_scheduled_time" class="field-error" role="alert" aria-live="polite"></div>
                     </div>
                 </div>
 
                 <!-- Shared fields -->
                 <div class="form-row">
                     <div class="form-group">
-                        <label for="format" class="form-label">Format *</label>
+                        <label for="format" class="form-label">Format <span class="req-star" aria-hidden="true">*</span></label>
                         <select class="form-control" id="format" name="format" required>
                             <option value="in_person">In Person</option>
                             <option value="virtual">Virtual</option>
@@ -558,7 +612,7 @@
                         </select>
                     </div>
                     <div class="form-group">
-                        <label for="volunteers_needed" class="form-label">Volunteers Needed *</label>
+                        <label for="volunteers_needed" class="form-label">Volunteers Needed <span class="req-star" aria-hidden="true">*</span></label>
                         <select class="form-control" id="volunteers_needed" name="volunteers_needed" required>
                             @for($i = 1; $i <= 5; $i++)
                                 <option value="{{ $i }}">{{ $i }}</option>
@@ -650,6 +704,68 @@
     }
 
     // -------------------------------------------------------------------------
+    // Validation helpers
+    // -------------------------------------------------------------------------
+    function clearErrors() {
+        document.querySelectorAll('.field-error').forEach(function (el) {
+            el.textContent = '';
+            el.style.display = 'none';
+        });
+        document.querySelectorAll('.form-control.is-invalid').forEach(function (el) {
+            el.classList.remove('is-invalid');
+        });
+    }
+
+    function showFieldError(fieldId, message) {
+        const field = document.getElementById(fieldId);
+        const errorEl = document.getElementById('error_' + fieldId);
+        if (field) field.classList.add('is-invalid');
+        if (errorEl) {
+            errorEl.textContent = message;
+            errorEl.style.display = '';
+        }
+    }
+
+    function validateMeetingForm() {
+        clearErrors();
+        let valid = true;
+
+        // Facility is always required
+        if (!document.getElementById('facility_id').value) {
+            showFieldError('facility_id', 'Please select a facility.');
+            valid = false;
+        }
+
+        const isRecurring = document.getElementById('recurringFields').style.display !== 'none';
+
+        if (isRecurring) {
+            // meeting_time is required for recurring
+            if (!document.getElementById('meeting_time').value) {
+                showFieldError('meeting_time', 'Please enter a meeting time.');
+                valid = false;
+            }
+        } else {
+            // scheduled_time is required for one-off
+            if (!document.getElementById('scheduled_time').value) {
+                showFieldError('scheduled_time', 'Please enter a date and time.');
+                valid = false;
+            }
+        }
+
+        return valid;
+    }
+
+    // Intercept submit — validate first; keep modal open on failure.
+    document.getElementById('meetingForm').addEventListener('submit', function (e) {
+        if (!validateMeetingForm()) {
+            e.preventDefault();
+            // Scroll to first error inside the modal body
+            const firstError = document.querySelector('.field-error[style*="block"], .field-error:not([style*="none"])');
+            if (firstError) firstError.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+    });
+
+    // -------------------------------------------------------------------------
     // Modal
     // -------------------------------------------------------------------------
     function openAddModal() {
@@ -657,10 +773,14 @@
         document.getElementById('modalTitle').textContent = 'Add Meeting';
         document.getElementById('submitBtn').textContent  = 'Add Meeting';
         form.reset();
+        clearErrors();
         form.action = '{{ route('meetings.store') }}';
         document.getElementById('formMethod').value = 'POST';
         document.getElementById('typeSection').style.display = '';
         document.getElementById('duration_minutes').value = '60';
+        // Pre-populate time so the browser's native time picker has a real value
+        // (avoids the empty "--:-- AM/PM" placeholder being mistaken for a filled field).
+        document.getElementById('meeting_time').value = '09:00';
         showRecurring();
         document.getElementById('meetingModal').classList.add('show');
     }
@@ -673,6 +793,7 @@
         document.getElementById('submitBtn').textContent  = 'Save Changes';
         form.action = '/meetings/' + m.meeting_id;
         document.getElementById('formMethod').value = 'PUT';
+        clearErrors();
 
         // Hide type toggle on edit — meeting type is immutable
         document.getElementById('typeSection').style.display = 'none';
@@ -693,7 +814,7 @@
             // meeting_time may be "HH:MM:SS" — trim to HH:MM for the time input
             document.getElementById('meeting_time').value  = m.meeting_time
                 ? m.meeting_time.substring(0, 5)
-                : '';
+                : '09:00';
         }
 
         // Shared fields
@@ -706,6 +827,7 @@
     }
 
     function closeModal() {
+        clearErrors();
         document.getElementById('meetingModal').classList.remove('show');
     }
 
