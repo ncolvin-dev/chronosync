@@ -240,6 +240,10 @@
         .vol-form-row { grid-template-columns: 1fr; gap: 0; }
     }
 
+    /* Sort select styling */
+    .sort-controls { display: flex; gap: 0.75rem; align-items: flex-end; }
+    .sort-controls .form-select { height: 2.6rem; padding: 0.5rem 0.75rem; }
+
     .search-and-filter {
         background: white;
         border-radius: 0.75rem;
@@ -757,6 +761,22 @@
                             <option value="probation" {{ request('status') === 'probation' ? 'selected' : '' }}>On Probation</option>
                         </select>
                     </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Sort By</label>
+                        <div class="sort-controls">
+                            <select class="form-select" name="sort" style="flex:1;">
+                                <option value="last_name"       {{ ($sort ?? 'last_name') === 'last_name'       ? 'selected' : '' }}>Last Name</option>
+                                <option value="first_name"      {{ ($sort ?? '') === 'first_name'      ? 'selected' : '' }}>First Name</option>
+                                <option value="clean_date"      {{ ($sort ?? '') === 'clean_date'      ? 'selected' : '' }}>Clean Date</option>
+                                <option value="probation_status"{{ ($sort ?? '') === 'probation_status'? 'selected' : '' }}>Status</option>
+                            </select>
+                            <select class="form-select" name="dir" style="width:90px;">
+                                <option value="asc"  {{ ($dir ?? 'asc') === 'asc'  ? 'selected' : '' }}>A–Z ▲</option>
+                                <option value="desc" {{ ($dir ?? '') === 'desc' ? 'selected' : '' }}>Z–A ▼</option>
+                            </select>
+                        </div>
+                    </div>
                 </div>
 
                 <div class="filter-actions">
@@ -850,7 +870,7 @@
             @if($volunteers->hasPages())
             <div class="volunteers-list-container" style="box-shadow: none; padding: 0;">
                 <div class="pagination">
-                    {{ $volunteers->links() }}
+                    {{ $volunteers->appends(request()->query())->links() }}
                 </div>
             </div>
             @endif

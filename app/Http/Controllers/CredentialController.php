@@ -48,7 +48,25 @@ class CredentialController extends Controller
             });
         }
 
-        $credentials     = $query->orderBy('expiration_date')->paginate(20);
+        // Sorting
+        $sortable = ['volunteer_name', 'credential_type', 'approval_date', 'expiration_date', 'status'];
+        $sort = in_array($request->sort, $sortable) ? $request->sort : 'expiration_date';
+        $dir  = $request->dir === 'desc' ? 'desc' : 'asc';
+
+        if ($sort === 'volunteer_name') {
+            $query->join('volunteers', 'volunteer_credentials.volunteer_id', '=', 'volunteers.volunteer_id')
+                  ->select('volunteer_credentials.*')
+                  ->orderBy('volunteers.last_name', $dir)
+                  ->orderBy('volunteers.first_name', $dir);
+        } elseif ($sort === 'credential_type') {
+            $query->join('credential_types', 'volunteer_credentials.credential_type_id', '=', 'credential_types.credential_type_id')
+                  ->select('volunteer_credentials.*')
+                  ->orderBy('credential_types.name', $dir);
+        } else {
+            $query->orderBy($sort, $dir);
+        }
+
+        $credentials = $query->paginate(20);
         $credentialTypes = CredentialType::orderBy('name')->get();
         $expiringCount   = $this->getExpiringCredentialsCount();
         $volunteers      = Volunteer::orderBy('last_name')->orderBy('first_name')->get();
@@ -64,7 +82,7 @@ class CredentialController extends Controller
             ->get();
 
         return view('coordinator.credentials', compact(
-            'credentials', 'credentialTypes', 'expiringCount', 'expiringSoon', 'volunteers', 'facilities'
+            'credentials', 'credentialTypes', 'expiringCount', 'expiringSoon', 'volunteers', 'facilities', 'sort', 'dir'
         ));
     }
 

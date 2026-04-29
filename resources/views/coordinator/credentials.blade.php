@@ -104,6 +104,14 @@
         white-space: nowrap;
     }
 
+    /* Sort headers */
+    .sort-link { color: inherit; text-decoration: none; display: inline-flex; align-items: center; gap: 0.25rem; white-space: nowrap; }
+    .sort-link:hover { color: #0099cc; }
+    .sort-icon { font-size: 0.7rem; opacity: 0.35; }
+    .sort-icon.active { opacity: 1; color: #0099cc; }
+    html.dark .sort-link:hover { color: #38bdf8; }
+    html.dark .sort-icon.active { color: #38bdf8; }
+
     .table td {
         padding: 1rem;
         border-bottom: 1px solid #e0e0e0;
@@ -407,12 +415,6 @@
         background-color: #1a2235 !important;
     }
 
-    /* Volunteer group header row */
-    html.dark .table > tbody > tr.volunteer-group-header > td {
-        background-color: #141d2e !important;
-        color: #93c5fd !important;
-        border-bottom-color: #2a3a50 !important;
-    }
 
     html.dark .table > tbody > tr > td {
         background-color: #1a2235 !important;
@@ -711,47 +713,73 @@
             </div>
             </form>
 
-            {{-- Credentials Table — grouped by volunteer --}}
+            {{-- Credentials Table --}}
             <div class="credentials-table">
                 <table class="table">
                     <thead>
                         <tr>
+                            @php
+                                $mkUrl = fn($col) => route('credentials.index', array_merge(
+                                    request()->except(['sort','dir','page']),
+                                    ['sort'=>$col, 'dir'=>($sort===$col && $dir==='asc') ? 'desc' : 'asc']
+                                ));
+                            @endphp
+                            <th>
+                                <a href="{{ $mkUrl('volunteer_name') }}" class="sort-link">
+                                    Volunteer
+                                    @if($sort === 'volunteer_name')
+                                        <span class="sort-icon active">{{ $dir === 'asc' ? '▲' : '▼' }}</span>
+                                    @else
+                                        <span class="sort-icon">⇅</span>
+                                    @endif
+                                </a>
+                            </th>
                             <th>Facility</th>
-                            <th>Credential Type</th>
-                            <th>Approval Date</th>
-                            <th>Expiration Date</th>
-                            <th>Status</th>
+                            <th>
+                                <a href="{{ $mkUrl('credential_type') }}" class="sort-link">
+                                    Credential Type
+                                    @if($sort === 'credential_type')
+                                        <span class="sort-icon active">{{ $dir === 'asc' ? '▲' : '▼' }}</span>
+                                    @else
+                                        <span class="sort-icon">⇅</span>
+                                    @endif
+                                </a>
+                            </th>
+                            <th>
+                                <a href="{{ $mkUrl('approval_date') }}" class="sort-link">
+                                    Approval Date
+                                    @if($sort === 'approval_date')
+                                        <span class="sort-icon active">{{ $dir === 'asc' ? '▲' : '▼' }}</span>
+                                    @else
+                                        <span class="sort-icon">⇅</span>
+                                    @endif
+                                </a>
+                            </th>
+                            <th>
+                                <a href="{{ $mkUrl('expiration_date') }}" class="sort-link">
+                                    Expiration Date
+                                    @if($sort === 'expiration_date')
+                                        <span class="sort-icon active">{{ $dir === 'asc' ? '▲' : '▼' }}</span>
+                                    @else
+                                        <span class="sort-icon">⇅</span>
+                                    @endif
+                                </a>
+                            </th>
+                            <th>
+                                <a href="{{ $mkUrl('status') }}" class="sort-link">
+                                    Status
+                                    @if($sort === 'status')
+                                        <span class="sort-icon active">{{ $dir === 'asc' ? '▲' : '▼' }}</span>
+                                    @else
+                                        <span class="sort-icon">⇅</span>
+                                    @endif
+                                </a>
+                            </th>
                             <th>Actions</th>
                         </tr>
                     </thead>
                     <tbody>
-                        @php $grouped = $credentials->getCollection()->groupBy('volunteer_id'); @endphp
-                        @if($grouped->isEmpty())
-                        <tr>
-                            <td colspan="6" style="text-align:center;padding:3rem;color:#999;">
-                                <i class="fas fa-certificate" style="font-size:2rem;display:block;margin-bottom:0.75rem;color:#ddd;"></i>
-                                No credentials match your filters.
-                            </td>
-                        </tr>
-                        @else
-                        @foreach($grouped as $volunteerId => $volCreds)
-                        {{-- Volunteer group header --}}
-                        <tr class="volunteer-group-header">
-                            <td colspan="6" style="background:#f0f4f8;padding:0.6rem 1rem;border-bottom:2px solid #d0dce8;">
-                                <strong style="color:#003366;font-size:0.95rem;">
-                                    <i class="fas fa-user" style="margin-right:0.4rem;color:#0099cc;"></i>
-                                    {{ $volCreds->first()->volunteer->first_name }} {{ $volCreds->first()->volunteer->last_name }}
-                                </strong>
-                                @if($volCreds->first()->volunteer->phone)
-                                    <span style="color:#666;font-size:0.82rem;margin-left:0.75rem;">
-                                        <i class="fas fa-phone" style="font-size:0.75rem;"></i>
-                                        {{ $volCreds->first()->volunteer->phone }}
-                                    </span>
-                                @endif
-                            </td>
-                        </tr>
-                        {{-- That volunteer's credentials --}}
-                        @foreach($volCreds as $cred)
+                        @forelse($credentials as $cred)
                         @php
                             $isExpiringSoon = $cred->status === 'approved'
                                 && $cred->expiration_date
@@ -761,6 +789,10 @@
                                 && \Carbon\Carbon::parse($cred->expiration_date)->isPast();
                         @endphp
                         <tr class="{{ $isExpiringSoon ? 'expiration-soon' : '' }}">
+                            <td>
+                                <strong>{{ $cred->volunteer->first_name }} {{ $cred->volunteer->last_name }}</strong><br>
+                                <small style="color:#999;">{{ $cred->volunteer->phone }}</small>
+                            </td>
                             <td>{{ $cred->facility?->facility_name ?? '—' }}</td>
                             <td>{{ $cred->credentialType?->display_name ?? '—' }}</td>
                             <td>{{ $cred->approval_date ? \Carbon\Carbon::parse($cred->approval_date)->format('M d, Y') : '—' }}</td>
@@ -888,9 +920,14 @@
                                 </div>
                             </td>
                         </tr>
-                        @endforeach
-                        @endforeach
-                        @endif
+                        @empty
+                        <tr>
+                            <td colspan="7" style="text-align:center;padding:3rem;color:#999;">
+                                <i class="fas fa-certificate" style="font-size:2rem;display:block;margin-bottom:0.75rem;color:#ddd;"></i>
+                                No credentials match your filters.
+                            </td>
+                        </tr>
+                        @endforelse
                     </tbody>
                 </table>
             </div>

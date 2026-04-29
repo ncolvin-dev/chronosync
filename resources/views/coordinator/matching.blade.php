@@ -437,6 +437,23 @@
         color: #cbd5e1 !important;
     }
 
+    /* Sort controls */
+    .sort-bar {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        flex-wrap: wrap;
+        padding: 0.75rem 1rem;
+        background: #f8f9fa;
+        border-bottom: 1px solid #e0e0e0;
+        font-size: 0.875rem;
+    }
+    .sort-bar label { font-weight: 600; color: #333; white-space: nowrap; }
+    .sort-bar select { padding: 0.35rem 0.6rem; border: 1px solid #ddd; border-radius: 0.4rem; font-size: 0.85rem; color: #333; background: white; }
+    html.dark .sort-bar { background: #141d2e; border-bottom-color: #2a3a50; }
+    html.dark .sort-bar label { color: #cbd5e1; }
+    html.dark .sort-bar select { background: #1a2235; border-color: #2a3a50; color: #e2e8f0; }
+
     @media (max-width: 1024px) {
         .meeting-row {
             flex-direction: column;
@@ -484,7 +501,7 @@
             </div>
 
             {{-- Filter Form --}}
-            <form method="GET" action="{{ route('meetings.index') }}">
+            <form method="GET" action="{{ route('coordinator.matching') }}">
             <div class="filter-section">
                 <div class="filter-title">Filter Meetings</div>
 
@@ -535,7 +552,7 @@
                     <button type="submit" class="btn-filter">
                         <i class="fas fa-filter"></i> Apply Filters
                     </button>
-                    <a href="{{ route('meetings.index') }}" class="btn-reset" style="text-decoration:none;display:inline-block;">
+                    <a href="{{ route('coordinator.matching') }}" class="btn-reset" style="text-decoration:none;display:inline-block;">
                         <i class="fas fa-redo"></i> Reset
                     </a>
                 </div>
@@ -544,6 +561,37 @@
 
             {{-- Meetings List --}}
             <div class="meetings-container">
+                {{-- Sort Bar --}}
+                @php
+                    $mkSortUrl = fn($col) => route('coordinator.matching', array_merge(
+                        request()->except(['sort','dir','page']),
+                        ['sort'=>$col, 'dir'=>($sort===$col && $dir==='asc') ? 'desc' : 'asc']
+                    ));
+                @endphp
+                <div class="sort-bar">
+                    <label><i class="fas fa-sort-amount-down"></i> Sort:</label>
+                    <a href="{{ $mkSortUrl('schedule') }}"
+                       style="text-decoration:none;padding:0.35rem 0.75rem;border-radius:0.4rem;font-weight:600;font-size:0.82rem;
+                              background:{{ $sort==='schedule' ? '#0099cc' : '#e0e0e0' }};
+                              color:{{ $sort==='schedule' ? 'white' : '#333' }};">
+                        Schedule
+                        @if($sort==='schedule')<span style="font-size:0.65rem;">{{ $dir==='asc' ? '▲' : '▼' }}</span>@endif
+                    </a>
+                    <a href="{{ $mkSortUrl('facility_name') }}"
+                       style="text-decoration:none;padding:0.35rem 0.75rem;border-radius:0.4rem;font-weight:600;font-size:0.82rem;
+                              background:{{ $sort==='facility_name' ? '#0099cc' : '#e0e0e0' }};
+                              color:{{ $sort==='facility_name' ? 'white' : '#333' }};">
+                        Facility
+                        @if($sort==='facility_name')<span style="font-size:0.65rem;">{{ $dir==='asc' ? '▲' : '▼' }}</span>@endif
+                    </a>
+                    <a href="{{ $mkSortUrl('next_occurrence') }}"
+                       style="text-decoration:none;padding:0.35rem 0.75rem;border-radius:0.4rem;font-weight:600;font-size:0.82rem;
+                              background:{{ $sort==='next_occurrence' ? '#0099cc' : '#e0e0e0' }};
+                              color:{{ $sort==='next_occurrence' ? 'white' : '#333' }};">
+                        Next Occurrence
+                        @if($sort==='next_occurrence')<span style="font-size:0.65rem;">{{ $dir==='asc' ? '▲' : '▼' }}</span>@endif
+                    </a>
+                </div>
                 @forelse($meetings as $meeting)
                 @php
                     $days  = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
@@ -761,6 +809,7 @@
                 {{ $meetings->appends(request()->query())->links() }}
             </div>
             @endif
+
         </div>
     </div>
 </div>

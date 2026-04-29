@@ -323,9 +323,10 @@ Route::middleware(['auth', 'session_timeout'])->group(function () {
     |----------------------------------------------------------------------
     */
 
-    Route::get('/admin/dashboard', [DashboardController::class, 'index'])
-        ->middleware('role:coordinator,admin')
-        ->name('admin.dashboard');
+    // Coordinator & Admin: main dashboard (coordinators are redirected here on login)
+    Route::middleware('role:coordinator,admin')->group(function () {
+        Route::get('/admin/dashboard', [DashboardController::class, 'index'])->name('admin.dashboard');
+    });
 
     Route::middleware('role:admin')->group(function () {
         Route::delete('/coordinators/{user}', [CoordinatorController::class, 'destroy'])
