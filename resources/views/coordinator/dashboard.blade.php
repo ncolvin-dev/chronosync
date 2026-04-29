@@ -397,33 +397,45 @@
             <div class="stat-cards">
                 <div class="stat-card">
                     <div class="stat-card-label">Active Volunteers</div>
-                    <div class="stat-card-value">47</div>
+                    <div class="stat-card-value">{{ $activeVolunteers }}</div>
                     <div class="stat-card-change">
-                        <i class="fas fa-arrow-up"></i> 3 new this month
+                        @if($newVolunteersMonth > 0)
+                            <i class="fas fa-arrow-up"></i> {{ $newVolunteersMonth }} new this month
+                        @else
+                            <i class="fas fa-arrow-right"></i> None added this month
+                        @endif
                     </div>
                 </div>
 
                 <div class="stat-card">
-                    <div class="stat-card-label">Facilities</div>
-                    <div class="stat-card-value">12</div>
+                    <div class="stat-card-label">Active Facilities</div>
+                    <div class="stat-card-value">{{ $activeFacilities }}</div>
                     <div class="stat-card-change">
                         <i class="fas fa-arrow-right"></i> All active
                     </div>
                 </div>
 
                 <div class="stat-card">
-                    <div class="stat-card-label">Meetings This Month</div>
-                    <div class="stat-card-value">34</div>
-                    <div class="stat-card-change">
-                        <i class="fas fa-arrow-up"></i> 5 pending assignments
+                    <div class="stat-card-label">Active Meetings</div>
+                    <div class="stat-card-value">{{ $activeMeetings }}</div>
+                    <div class="stat-card-change {{ $meetingsNeedingVolunteers > 0 ? 'negative' : '' }}">
+                        @if($meetingsNeedingVolunteers > 0)
+                            <i class="fas fa-exclamation-circle"></i> {{ $meetingsNeedingVolunteers }} need volunteers
+                        @else
+                            <i class="fas fa-check-circle"></i> All covered
+                        @endif
                     </div>
                 </div>
 
                 <div class="stat-card">
-                    <div class="stat-card-label">Pending Matches</div>
-                    <div class="stat-card-value">5</div>
-                    <div class="stat-card-change negative">
-                        <i class="fas fa-exclamation-circle"></i> Needs attention
+                    <div class="stat-card-label">Pending Confirmations</div>
+                    <div class="stat-card-value">{{ $pendingConfirmations }}</div>
+                    <div class="stat-card-change {{ $pendingConfirmations > 0 ? 'negative' : '' }}">
+                        @if($pendingConfirmations > 0)
+                            <i class="fas fa-exclamation-circle"></i> Awaiting response
+                        @else
+                            <i class="fas fa-check-circle"></i> All confirmed
+                        @endif
                     </div>
                 </div>
             </div>
@@ -449,48 +461,31 @@
                                     </tr>
                                 </thead>
                                 <tbody>
+                                    @forelse($weekAssignments as $assignment)
+                                    @php
+                                        $isPending = $assignment->status === 'pending_confirmation';
+                                        $timeDisplay = $assignment->meeting->meeting_time
+                                            ? \Carbon\Carbon::createFromFormat('H:i:s', $assignment->meeting->meeting_time)->format('g:i A')
+                                            : ($assignment->meeting->scheduled_time
+                                                ? \Carbon\Carbon::parse($assignment->meeting->scheduled_time)->format('g:i A')
+                                                : '—');
+                                    @endphp
                                     <tr>
-                                        <td>Mon, Mar 31</td>
-                                        <td>6:30 PM</td>
-                                        <td>Harmony House</td>
-                                        <td>Alex Johnson</td>
-                                        <td><span class="status-badge status-confirmed">Confirmed</span></td>
+                                        <td>{{ \Carbon\Carbon::parse($assignment->assignment_date)->format('D, M j') }}</td>
+                                        <td>{{ $timeDisplay }}</td>
+                                        <td>{{ $assignment->meeting->facility->facility_name }}</td>
+                                        <td>{{ $assignment->volunteer->first_name }} {{ $assignment->volunteer->last_name }}</td>
+                                        <td>
+                                            <span class="status-badge {{ $isPending ? 'status-pending' : 'status-confirmed' }}">
+                                                {{ $isPending ? 'Pending' : 'Confirmed' }}
+                                            </span>
+                                        </td>
                                     </tr>
+                                    @empty
                                     <tr>
-                                        <td>Tue, Apr 1</td>
-                                        <td>7:00 PM</td>
-                                        <td>New Path Center</td>
-                                        <td>Morgan Davis</td>
-                                        <td><span class="status-badge status-pending">Pending</span></td>
+                                        <td colspan="5" class="empty-row">No assignments in the next 7 days.</td>
                                     </tr>
-                                    <tr>
-                                        <td>Wed, Apr 2</td>
-                                        <td>6:00 PM</td>
-                                        <td>Sunrise Community</td>
-                                        <td>Jordan Taylor</td>
-                                        <td><span class="status-badge status-confirmed">Confirmed</span></td>
-                                    </tr>
-                                    <tr class="unfilled">
-                                        <td>Thu, Apr 3</td>
-                                        <td>7:30 PM</td>
-                                        <td>Recovery Plus</td>
-                                        <td><em>Unfilled</em></td>
-                                        <td><span class="status-badge status-unfilled">Unfilled</span></td>
-                                    </tr>
-                                    <tr>
-                                        <td>Fri, Apr 4</td>
-                                        <td>6:00 PM</td>
-                                        <td>Hope Center</td>
-                                        <td>Casey Miller</td>
-                                        <td><span class="status-badge status-confirmed">Confirmed</span></td>
-                                    </tr>
-                                    <tr class="unfilled">
-                                        <td>Sat, Apr 5</td>
-                                        <td>5:00 PM</td>
-                                        <td>Harmony House</td>
-                                        <td><em>Unfilled</em></td>
-                                        <td><span class="status-badge status-unfilled">Unfilled</span></td>
-                                    </tr>
+                                    @endforelse
                                 </tbody>
                             </table>
                         </div>
@@ -506,20 +501,28 @@
                 <!-- Sidebar -->
                 <div class="dashboard-sidebar">
                     <!-- Alerts -->
+                    @if($expiringCredentials > 0 || $meetingsNeedingVolunteers > 0 || $pendingConfirmations > 0)
                     <div class="alerts-section">
                         <div class="alerts-title">
                             <i class="fas fa-exclamation-triangle"></i> Alerts
                         </div>
+                        @if($expiringCredentials > 0)
                         <div class="alert-item">
-                            <strong>2 credentials</strong> expiring within 30 days
+                            <strong>{{ $expiringCredentials }} credential{{ $expiringCredentials !== 1 ? 's' : '' }}</strong> expiring within 30 days
                         </div>
+                        @endif
+                        @if($meetingsNeedingVolunteers > 0)
                         <div class="alert-item">
-                            <strong>5 meetings</strong> need volunteers
+                            <strong>{{ $meetingsNeedingVolunteers }} meeting{{ $meetingsNeedingVolunteers !== 1 ? 's' : '' }}</strong> need volunteers
                         </div>
+                        @endif
+                        @if($pendingConfirmations > 0)
                         <div class="alert-item">
-                            <strong>3 pending</strong> confirmations
+                            <strong>{{ $pendingConfirmations }} pending</strong> confirmation{{ $pendingConfirmations !== 1 ? 's' : '' }}
                         </div>
+                        @endif
                     </div>
+                    @endif
 
                     <!-- Quick Actions -->
                     <div class="section-card">
@@ -544,51 +547,43 @@
                     <div class="section-card">
                         <h2 class="section-title">Recent Activity</h2>
                         <ul class="activity-feed">
+                            @forelse($recentActivity as $log)
+                            @php
+                                $icon = match($log->action) {
+                                    'assign_volunteer'   => 'fa-link',
+                                    'confirm_assignment' => 'fa-check-circle',
+                                    'cancel_assignment'  => 'fa-times-circle',
+                                    'create_volunteer'   => 'fa-user-plus',
+                                    'update_volunteer'   => 'fa-user-edit',
+                                    'approve_credential' => 'fa-certificate',
+                                    'deny_credential'    => 'fa-times-circle',
+                                    'create_facility'    => 'fa-building',
+                                    'update_facility'    => 'fa-building',
+                                    'create_meeting'     => 'fa-calendar-plus',
+                                    'update_meeting'     => 'fa-calendar-alt',
+                                    'send_reminder'      => 'fa-bell',
+                                    default              => 'fa-cog',
+                                };
+                                $actor = $log->actor?->name ?? 'System';
+                            @endphp
                             <li class="activity-item">
                                 <div class="activity-icon">
-                                    <i class="fas fa-check-circle"></i>
+                                    <i class="fas {{ $icon }}"></i>
                                 </div>
                                 <div class="activity-content">
-                                    <div class="activity-action">Volunteer confirmed</div>
-                                    <div class="activity-time">2 hours ago</div>
+                                    <div class="activity-action">{{ $log->action_label }}</div>
+                                    <div class="activity-time">
+                                        {{ $actor }} &bull; {{ \Carbon\Carbon::parse($log->created_at)->diffForHumans() }}
+                                    </div>
                                 </div>
                             </li>
+                            @empty
                             <li class="activity-item">
-                                <div class="activity-icon">
-                                    <i class="fas fa-user-plus"></i>
-                                </div>
                                 <div class="activity-content">
-                                    <div class="activity-action">New volunteer registered</div>
-                                    <div class="activity-time">4 hours ago</div>
+                                    <div class="activity-action" style="color:#999;font-style:italic;">No recent activity.</div>
                                 </div>
                             </li>
-                            <li class="activity-item">
-                                <div class="activity-icon">
-                                    <i class="fas fa-certificate"></i>
-                                </div>
-                                <div class="activity-content">
-                                    <div class="activity-action">Credential approved</div>
-                                    <div class="activity-time">1 day ago</div>
-                                </div>
-                            </li>
-                            <li class="activity-item">
-                                <div class="activity-icon">
-                                    <i class="fas fa-building"></i>
-                                </div>
-                                <div class="activity-content">
-                                    <div class="activity-action">Facility updated</div>
-                                    <div class="activity-time">2 days ago</div>
-                                </div>
-                            </li>
-                            <li class="activity-item">
-                                <div class="activity-icon">
-                                    <i class="fas fa-link"></i>
-                                </div>
-                                <div class="activity-content">
-                                    <div class="activity-action">Matching completed</div>
-                                    <div class="activity-time">3 days ago</div>
-                                </div>
-                            </li>
+                            @endforelse
                         </ul>
                     </div>
                 </div>

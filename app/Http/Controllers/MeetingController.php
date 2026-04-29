@@ -220,15 +220,87 @@ class MeetingController extends Controller
             'override_reason' => 'nullable|string|max:500',
         ]);
 
-        // Fall back to the meeting's next computed occurrence when no date is submitted.
+        $type             = $validated['assignment_type'] ?? 'manual';
+        $assignAllRecurring = $request->boolean('assign_all_recurring');
+
+        // When checked, assign to every active meeting that shares the same recurring schedule.
+        if ($assignAllRecurring && $meeting->day_of_week !== null) {
+            $siblings = Meeting::where('day_of_week', $meeting->day_of_week)
+                ->where('week_of_month', $meeting->week_of_month)
+                ->where('meeting_time', $meeting->meeting_time)
+                ->where('facility_id', $meeting->facility_id)
+                ->where('status', 'active')
+                ->get();
+
+            $assigned = 0;
+            $skipped  = 0;
+
+            foreach ($siblings as $sibling) {
+                $dateStr = $sibling->nextOccurrence()?->toDateString();
+
+                if (!$dateStr) { $skipped++; continue; }
+
+                if ($sibling->activeAssignmentsForDate($dateStr)->count() >= $sibling->volunteers_needed) {
+                    $skipped++; continue;
+                }
+
+                $alreadyAssigned = MeetingAssignment::where('meeting_id', $sibling->meeting_id)
+                    ->where('volunteer_id', $validated['volunteer_id'])
+                    ->where('assignment_date', $dateStr)
+                    ->whereIn('status', ['pending_confirmation', 'confirmed'])
+                    ->exists();
+
+                if ($alreadyAssigned) { $skipped++; continue; }
+
+                $a = DB::transaction(function () use ($validated, $sibling, $dateStr, $type) {
+                    $a = MeetingAssignment::create([
+                        'meeting_id'      => $sibling->meeting_id,
+                        'volunteer_id'    => $validated['volunteer_id'],
+                        'assignment_date' => $dateStr,
+                        'status'          => 'pending_confirmation',
+                        'assignment_type' => $type,
+                        'override_reason' => $validated['override_reason'] ?? null,
+                    ]);
+
+                    AuditLog::create([
+                        'actor_user_id'  => auth()->id(),
+                        'action'         => 'assign_volunteer',
+                        'entity_type'    => 'meeting_assignments',
+                        'entity_id'      => $a->meeting_assignment_id,
+                        'change_details' => [
+                            'volunteer_id'    => $validated['volunteer_id'],
+                            'meeting_id'      => $sibling->meeting_id,
+                            'assignment_date' => $dateStr,
+                            'assignment_type' => $type,
+                        ],
+                    ]);
+
+                    return $a;
+                });
+
+                if ($a->volunteer?->is_sms_deliverable) {
+                    SendSmsJob::dispatch($a, 'confirmation_request');
+                }
+
+                $this->snsService->syncSubscriptions($sibling);
+                $assigned++;
+            }
+
+            $msg = "Volunteer assigned to {$assigned} meeting(s).";
+            if ($skipped > 0) {
+                $msg .= " {$skipped} skipped (already assigned or at capacity).";
+            }
+
+            return back()->with('success', $msg);
+        }
+
+        // Single assignment — fall back to the meeting's next computed occurrence when no date supplied.
         $dateStr = $validated['assignment_date']
             ?? $meeting->nextOccurrence()?->toDateString();
 
         if (!$dateStr) {
             return back()->with('error', 'Could not determine the next occurrence date for this meeting.');
         }
-
-        $type = $validated['assignment_type'] ?? 'manual';
 
         // Guard: check the volunteer cap before touching the database.
         $current = $meeting->activeAssignmentsForDate($dateStr)->count();
@@ -274,14 +346,12 @@ class MeetingController extends Controller
             return $assignment;
         });
 
-        // SMS is dispatched after the transaction commits.
-        // A queued job means provider latency does not affect response time,
-        // and a provider outage cannot roll back the successfully saved assignment.
+        // SMS is dispatched after the transaction commits so provider latency
+        // cannot block the response or roll back the saved assignment.
         if ($assignment->volunteer?->is_sms_deliverable) {
             SendSmsJob::dispatch($assignment, 'confirmation_request');
         }
 
-        // Sync SNS subscriptions so the newly assigned volunteer is added to the topic.
         $this->snsService->syncSubscriptions($meeting);
 
         return back()->with('success', 'Volunteer assigned and confirmation request sent.');

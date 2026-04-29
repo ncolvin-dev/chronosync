@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Auth\AuthController;
+use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\AvailabilityController;
 use App\Http\Controllers\CoordinatorController;
 use App\Http\Controllers\CredentialController;
@@ -322,9 +323,7 @@ Route::middleware(['auth', 'session_timeout'])->group(function () {
             ->name('coordinators.destroy');
 
         // System settings, user management, audit logs, etc.
-        Route::get('/admin/dashboard', function () {
-            return view('coordinator.dashboard');
-        })->name('admin.dashboard');
+        Route::get('/admin/dashboard', [DashboardController::class, 'index'])->name('admin.dashboard');
 
         Route::get('/admin/audit-logs', function () {
             return view('admin.audit-logs');

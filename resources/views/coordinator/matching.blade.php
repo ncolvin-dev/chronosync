@@ -412,25 +412,29 @@
         border-bottom-color: #2a3a50;
     }
 
-    html.dark #manualAssignOverlay > div {
+    html.dark #assignOverlay > div {
         background-color: #1a2235 !important;
         color: #e2e8f0;
     }
 
-    html.dark #manualAssignOverlay label {
+    html.dark #assignOverlay label {
         color: #e2e8f0 !important;
     }
 
-    html.dark #manualAssignOverlay select,
-    html.dark #manualAssignOverlay input[type="date"],
-    html.dark #manualAssignOverlay textarea {
+    html.dark #assignOverlay select,
+    html.dark #assignOverlay input[type="date"],
+    html.dark #assignOverlay textarea {
         background-color: #141d2e !important;
         border-color: #2a3a50 !important;
         color: #e2e8f0 !important;
     }
 
-    html.dark #manualAssignOverlay p {
+    html.dark #assignOverlay p {
         color: #94a3b8 !important;
+    }
+
+    html.dark #assignAllSection span {
+        color: #cbd5e1 !important;
     }
 
     @media (max-width: 1024px) {
@@ -722,9 +726,6 @@
                         @if($spotsRemaining > 0)
                             @if($upcomingAssignments->isEmpty())
                                 <div class="volunteers-title">Assign Volunteer</div>
-                                <div class="no-candidates" style="margin-bottom:0.75rem;">
-                                    Auto-assign picks the top-scored match, or choose manually.
-                                </div>
                             @else
                                 <div style="font-size:0.8rem;color:#888;margin:0.5rem 0 0.75rem;">
                                     {{ $spotsRemaining }} spot{{ $spotsRemaining > 1 ? 's' : '' }} still open
@@ -732,12 +733,8 @@
                             @endif
                             <div class="volunteer-actions">
                                 <button class="btn-assign"
-                                        onclick="autoAssign('{{ $meeting->meeting_id }}', '{{ $nextDateStr }}', this)">
-                                    <i class="fas fa-magic"></i> Auto-Assign
-                                </button>
-                                <button class="btn-change"
-                                        onclick="openManualAssign('{{ $meeting->meeting_id }}', '{{ $nextDateStr }}')">
-                                    <i class="fas fa-hand-pointer"></i> Manual Assign
+                                        onclick="openAssign('{{ $meeting->meeting_id }}', '{{ $nextDateStr }}', {{ $meeting->day_of_week !== null ? 'true' : 'false' }})">
+                                    <i class="fas fa-hand-pointer"></i> Assign
                                 </button>
                             </div>
                         @endif
@@ -761,10 +758,10 @@
     </div>
 </div>
 
-{{-- Manual Assign Modal --}}
-<div id="manualAssignOverlay"
+{{-- Assign Modal --}}
+<div id="assignOverlay"
      style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1000;"
-     onclick="if(event.target===this) closeManualAssign();">
+     onclick="if(event.target===this) closeAssign();">
     <div style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
                 background:white;border-radius:0.75rem;box-shadow:0 10px 40px rgba(0,0,0,0.2);
                 width:90%;max-width:480px;overflow:hidden;">
@@ -772,13 +769,13 @@
         <div style="background:linear-gradient(135deg,#003366,#0099cc);color:white;
                     padding:1.25rem 1.5rem;display:flex;align-items:center;justify-content:space-between;">
             <h3 style="margin:0;font-size:1.1rem;font-weight:700;">
-                <i class="fas fa-user-check"></i> Manually Assign Volunteer
+                <i class="fas fa-user-check"></i> Assign Volunteer
             </h3>
-            <button onclick="closeManualAssign()"
+            <button onclick="closeAssign()"
                     style="background:none;border:none;color:white;font-size:1.5rem;cursor:pointer;line-height:1;">×</button>
         </div>
 
-        <form id="manualAssignForm" method="POST" style="padding:1.5rem;">
+        <form id="assignForm" method="POST" style="padding:1.5rem;">
             @csrf
             <input type="hidden" name="assignment_type" value="manual">
 
@@ -797,7 +794,18 @@
                 </select>
             </div>
 
-            <input type="hidden" id="modalAssignDate" name="assignment_date">
+            <input type="hidden" id="assignDate" name="assignment_date">
+
+            <div id="assignAllSection" style="display:none;margin-bottom:1.25rem;padding:0.75rem;background:#f8f9fa;border-radius:0.5rem;">
+                <label style="display:flex;align-items:flex-start;gap:0.6rem;cursor:pointer;margin:0;">
+                    <input type="checkbox" name="assign_all_recurring" value="1"
+                           id="assignAllRecurring"
+                           style="margin-top:0.15rem;width:1rem;height:1rem;flex-shrink:0;cursor:pointer;">
+                    <span style="font-size:0.875rem;color:#333;">
+                        Assign to <strong>all recurring meetings</strong> at this same day, time &amp; facility
+                    </span>
+                </label>
+            </div>
 
             <div style="margin-bottom:1.5rem;">
                 <label style="display:block;font-weight:600;color:#333;margin-bottom:0.4rem;font-size:0.875rem;">
@@ -809,7 +817,7 @@
             </div>
 
             <div style="display:flex;gap:0.75rem;justify-content:flex-end;">
-                <button type="button" onclick="closeManualAssign()"
+                <button type="button" onclick="closeAssign()"
                         style="padding:0.65rem 1.25rem;background:#e0e0e0;color:#333;border:none;border-radius:0.5rem;font-weight:600;cursor:pointer;">
                     Cancel
                 </button>
@@ -826,102 +834,29 @@
 
 @section('extra-scripts')
 <script>
-    /**
-     * Auto-assign the best available volunteer to a meeting via the API,
-     * then refresh the page so the new assignment is reflected.
-     *
-     * @param {string} meetingId   - The meeting's ULID
-     * @param {string} dateStr     - ISO date string for the target occurrence (YYYY-MM-DD)
-     * @param {HTMLElement} btn    - The clicked button (disabled during request)
-     */
-    function autoAssign(meetingId, dateStr, btn) {
-        if (!dateStr) {
-            showAlert('No upcoming occurrence date found for this meeting. Use Manual Assign to pick a date.', 'error');
-            return;
-        }
-
-        btn.disabled = true;
-        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Assigning…';
-
-        fetch(`/api/meetings/${meetingId}/auto-assign`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
-                'Accept': 'application/json',
-            },
-            body: JSON.stringify({ assignment_date: dateStr }),
-        })
-        .then(res => res.json().then(data => ({ ok: res.ok, data })))
-        .then(({ ok, data }) => {
-            if (ok) {
-                // Refresh to show the new assignment
-                window.location.reload();
-            } else {
-                const msg = data?.message || 'No eligible volunteer found. Try again later.';
-                showAlert(msg, 'error');
-                btn.disabled = false;
-                btn.innerHTML = '<i class="fas fa-check"></i> Auto-Assign';
-            }
-        })
-        .catch(() => {
-            showAlert('Network error. Please try again.', 'error');
-            btn.disabled = false;
-            btn.innerHTML = '<i class="fas fa-check"></i> Auto-Assign';
-        });
-    }
-
-    /**
-     * Show a transient status message at the top of the meetings container.
-     */
-    function showAlert(message, type) {
-        const existing = document.getElementById('matching-alert');
-        if (existing) existing.remove();
-
-        const color = type === 'error' ? '#f8d7da' : '#d4edda';
-        const text  = type === 'error' ? '#721c24'  : '#155724';
-
-        const el = document.createElement('div');
-        el.id = 'matching-alert';
-        el.style.cssText = `
-            background:${color}; color:${text}; border-radius:0.5rem;
-            padding:0.875rem 1.25rem; margin-bottom:1rem; font-weight:500;
-            display:flex; align-items:center; gap:0.5rem;
-        `;
-        el.innerHTML = `<i class="fas fa-${type === 'error' ? 'exclamation-circle' : 'check-circle'}"></i> ${message}
-            <button onclick="this.parentElement.remove()" style="margin-left:auto;background:none;border:none;cursor:pointer;font-size:1.1rem;color:inherit;">×</button>`;
-
-        document.querySelector('.meetings-container').insertAdjacentElement('beforebegin', el);
-        if (type !== 'error') setTimeout(() => el.remove(), 4000);
-    }
-
-    /**
-     * Open the manual assign modal, pre-filling the form for the given meeting.
-     *
-     * @param {string} meetingId - The meeting's ULID
-     * @param {string} dateStr   - ISO date string (YYYY-MM-DD) for the next occurrence
-     */
-    function openManualAssign(meetingId, dateStr) {
-        const form = document.getElementById('manualAssignForm');
+    function openAssign(meetingId, dateStr, isRecurring) {
+        const form = document.getElementById('assignForm');
         form.action = `/meetings/${meetingId}/assign`;
 
-        const dateInput = document.getElementById('modalAssignDate');
-        dateInput.value = dateStr || '';
+        document.getElementById('assignDate').value = dateStr || '';
 
-        // Reset the volunteer select to the placeholder
         form.querySelector('select[name="volunteer_id"]').value = '';
         form.querySelector('textarea[name="override_reason"]').value = '';
 
-        document.getElementById('manualAssignOverlay').style.display = 'block';
+        const allSection  = document.getElementById('assignAllSection');
+        const allCheckbox = document.getElementById('assignAllRecurring');
+        allSection.style.display = isRecurring ? 'block' : 'none';
+        allCheckbox.checked = false;
+
+        document.getElementById('assignOverlay').style.display = 'block';
     }
 
-    function closeManualAssign() {
-        document.getElementById('manualAssignOverlay').style.display = 'none';
+    function closeAssign() {
+        document.getElementById('assignOverlay').style.display = 'none';
     }
 
-    // Close modal on Escape key
     document.addEventListener('keydown', function(e) {
-        if (e.key === 'Escape') closeManualAssign();
+        if (e.key === 'Escape') closeAssign();
     });
 </script>
 @endsection
