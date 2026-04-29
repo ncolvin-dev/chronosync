@@ -5,54 +5,54 @@ namespace App\Http\Controllers;
 use App\Models\Meeting;
 use App\Models\MeetingAssignment;
 use App\Models\Facility;
-use App\Models\Credential;
+use App\Models\VolunteerCredential;
 use App\Models\Volunteer;
 use Illuminate\Http\Request;
 use Carbon\Carbon;
-use Barryvdh\DomPDF\Facade\Pdf;
 
 class ReportController extends Controller
 {
     /**
      * Coverage report with date range filter.
+     *
+     * Meetings in ChronoSync are recurring patterns, not dated instances.
+     * The dated unit is MeetingAssignment (assignment_date). All date-range
+     * queries here run against assignment_date, not a non-existent date_scheduled.
      */
     public function coverageSummary(Request $request)
     {
         $this->authorizeCoordinatorOrAdmin();
 
-        $dateFrom = $request->input('date_from', now()->startOfMonth());
-        $dateTo = $request->input('date_to', now()->endOfMonth());
+        $dateFrom = Carbon::parse($request->input('date_from', now()->startOfMonth()));
+        $dateTo   = Carbon::parse($request->input('date_to', now()->endOfMonth()));
 
-        $query = Meeting::whereBetween('date_scheduled', [$dateFrom, $dateTo])
-            ->with('facility', 'assignments');
+        $assignments = MeetingAssignment::whereBetween('assignment_date', [$dateFrom, $dateTo])
+            ->with('meeting.facility')
+            ->get();
 
-        $totalMeetings = $query->count();
-        $assignedMeetings = $query->clone()->has('assignments')->count();
-        $unassignedMeetings = $totalMeetings - $assignedMeetings;
-        $completedMeetings = $query->clone()->where('status', 'completed')->count();
-        $cancelledMeetings = $query->clone()->where('status', 'cancelled')->count();
+        $totalMeetings      = $assignments->count();
+        $assignedMeetings   = $assignments->whereIn('status', ['confirmed', 'completed'])->count();
+        $unassignedMeetings = $assignments->whereIn('status', ['pending_confirmation', 'declined'])->count();
+        $completedMeetings  = $assignments->where('status', 'completed')->count();
+        $cancelledMeetings  = $assignments->where('status', 'cancelled')->count();
 
         // Coverage by facility
         $coverageByFacility = Facility::withoutTrashed()
-            ->with([
-                'meetings' => function ($q) use ($dateFrom, $dateTo) {
-                    $q->whereBetween('date_scheduled', [$dateFrom, $dateTo]);
-                },
-                'meetings.assignments',
-            ])
+            ->with(['meetings.assignments' => function ($q) use ($dateFrom, $dateTo) {
+                $q->whereBetween('assignment_date', [$dateFrom, $dateTo]);
+            }])
             ->get()
             ->map(function ($facility) {
-                $total = $facility->meetings->count();
-                $assigned = $facility->meetings
-                    ->filter(fn($m) => $m->assignments->count() > 0)
-                    ->count();
+                $facilityAssignments = $facility->meetings->flatMap->assignments;
+                $total    = $facilityAssignments->count();
+                $covered  = $facilityAssignments->whereIn('status', ['confirmed', 'completed'])->count();
 
                 return [
-                    'facility_name' => $facility->name,
-                    'total_meetings' => $total,
-                    'assigned' => $assigned,
-                    'unassigned' => $total - $assigned,
-                    'coverage_percentage' => $total > 0 ? round(($assigned / $total) * 100, 1) : 0,
+                    'facility_name'       => $facility->facility_name,
+                    'total_meetings'      => $total,
+                    'assigned'            => $covered,
+                    'unassigned'          => $total - $covered,
+                    'coverage_percentage' => $total > 0 ? round(($covered / $total) * 100, 1) : 0,
                 ];
             });
 
@@ -70,6 +70,8 @@ class ReportController extends Controller
 
     /**
      * Facility detail report.
+     *
+     * Shows individual assignment occurrences for a facility in a date range.
      */
     public function facilitySchedule(Request $request)
     {
@@ -77,21 +79,24 @@ class ReportController extends Controller
 
         $facility = Facility::findOrFail($request->facility_id);
 
-        $dateFrom = $request->input('date_from', now()->startOfMonth());
-        $dateTo = $request->input('date_to', now()->endOfMonth());
+        $dateFrom = Carbon::parse($request->input('date_from', now()->startOfMonth()));
+        $dateTo   = Carbon::parse($request->input('date_to', now()->endOfMonth()));
 
-        $meetings = $facility->meetings()
-            ->whereBetween('date_scheduled', [$dateFrom, $dateTo])
-            ->with('assignments.volunteer.user')
-            ->orderBy('date_scheduled')
+        $meetings = MeetingAssignment::whereHas('meeting', function ($q) use ($facility) {
+                $q->where('facility_id', $facility->facility_id);
+            })
+            ->whereBetween('assignment_date', [$dateFrom, $dateTo])
+            ->with('meeting', 'volunteer')
+            ->orderBy('assignment_date')
             ->get()
-            ->map(function ($meeting) {
+            ->map(function ($assignment) {
                 return [
-                    'date' => $meeting->date_scheduled->format('Y-m-d H:i'),
-                    'type' => $meeting->meeting_type,
-                    'assigned_volunteer' => $meeting->assignments->first()?->volunteer->user->full_name ?? 'Unassigned',
-                    'status' => $meeting->status,
-                    'notes' => $meeting->description,
+                    'date'               => $assignment->assignment_date->format('Y-m-d'),
+                    'time'               => substr($assignment->meeting->meeting_time, 0, 5),
+                    'type'               => $assignment->meeting->format,
+                    'assigned_volunteer' => $assignment->volunteer?->full_name ?? 'Unassigned',
+                    'status'             => $assignment->status,
+                    'notes'              => $assignment->meeting->notes,
                 ];
             });
 
@@ -107,28 +112,28 @@ class ReportController extends Controller
 
         $daysUntilExpiry = $request->input('days_until', 30);
 
-        $expiringCredentials = Credential::where('status', 'active')
+        $expiringCredentials = VolunteerCredential::where('status', 'approved')
+            ->whereNotNull('expiration_date')
             ->whereDate('expiration_date', '<=', now()->addDays($daysUntilExpiry))
             ->whereDate('expiration_date', '>', now())
-            ->with('volunteer.user')
+            ->with('volunteer', 'credentialType')
             ->orderBy('expiration_date')
             ->get()
             ->map(function ($credential) {
                 $daysLeft = now()->diffInDays($credential->expiration_date);
                 return [
-                    'volunteer_name' => $credential->volunteer->user->full_name,
-                    'email' => $credential->volunteer->user->email,
-                    'credential_type' => $credential->credential_type,
-                    'expiration_date' => $credential->expiration_date->format('Y-m-d'),
+                    'volunteer_name'    => $credential->volunteer->full_name,
+                    'email'             => $credential->volunteer->email,
+                    'credential_type'   => $credential->credentialType->name,
+                    'expiration_date'   => $credential->expiration_date->format('Y-m-d'),
                     'days_until_expiry' => $daysLeft,
-                    'urgency' => $daysLeft <= 7 ? 'critical' : ($daysLeft <= 14 ? 'high' : 'medium'),
+                    'urgency'           => $daysLeft <= 7 ? 'critical' : ($daysLeft <= 14 ? 'high' : 'medium'),
                 ];
             });
 
-        $expiredCredentials = Credential::where('status', 'active')
+        $expiredCredentials = VolunteerCredential::where('status', 'approved')
+            ->whereNotNull('expiration_date')
             ->whereDate('expiration_date', '<=', now())
-            ->with('volunteer.user')
-            ->get()
             ->count();
 
         return view('placeholder.coming-soon', compact(
@@ -140,30 +145,31 @@ class ReportController extends Controller
 
     /**
      * Unfilled meetings sorted by urgency.
+     *
+     * Shows active recurring meeting slots with no upcoming assignments.
      */
     public function unfilledMeetings(Request $request)
     {
         $this->authorizeCoordinatorOrAdmin();
 
-        $meetings = Meeting::where('date_scheduled', '>=', now())
-            ->where('status', '!=', 'cancelled')
-            ->doesntHave('assignments')
+        $meetings = Meeting::where('status', 'active')
+            ->whereDoesntHave('assignments', function ($q) {
+                $q->where('assignment_date', '>=', now()->toDateString());
+            })
             ->with('facility')
-            ->orderBy('date_scheduled')
             ->get()
             ->map(function ($meeting) {
-                $hoursUntilMeeting = now()->diffInHours($meeting->date_scheduled);
+                $pattern = (Meeting::WEEK_LABELS[$meeting->week_of_month] ?? $meeting->week_of_month)
+                    . ' ' . (Meeting::DAY_NAMES[$meeting->day_of_week] ?? $meeting->day_of_week)
+                    . ' at ' . substr($meeting->meeting_time, 0, 5);
+
                 return [
-                    'meeting_id' => $meeting->id,
-                    'facility_name' => $meeting->facility->name,
-                    'scheduled_for' => $meeting->date_scheduled->format('Y-m-d H:i'),
-                    'hours_until' => $hoursUntilMeeting,
-                    'urgency' => $hoursUntilMeeting <= 24 ? 'critical' : ($hoursUntilMeeting <= 72 ? 'high' : 'medium'),
-                    'meeting_type' => $meeting->meeting_type,
+                    'meeting_id'    => $meeting->meeting_id,
+                    'facility_name' => $meeting->facility->facility_name,
+                    'pattern'       => $pattern,
+                    'format'        => $meeting->format,
                 ];
             })
-            ->sortBy(fn($m) => $m['hours_until'])
-            ->values()
             ->all();
 
         return view('placeholder.coming-soon', compact('meetings'));
@@ -177,12 +183,12 @@ class ReportController extends Controller
         $this->authorizeCoordinatorOrAdmin();
 
         $reportType = $request->input('report_type', 'coverage');
-        $dateFrom = $request->input('date_from', now()->startOfMonth());
-        $dateTo = $request->input('date_to', now()->endOfMonth());
+        $dateFrom   = Carbon::parse($request->input('date_from', now()->startOfMonth()));
+        $dateTo     = Carbon::parse($request->input('date_to', now()->endOfMonth()));
 
         $filename = "chronosync-{$reportType}-" . now()->format('Y-m-d') . '.csv';
-        $headers = [
-            'Content-Type' => 'text/csv; charset=utf-8',
+        $headers  = [
+            'Content-Type'        => 'text/csv; charset=utf-8',
             'Content-Disposition' => "attachment; filename=\"{$filename}\"",
         ];
 
@@ -207,24 +213,28 @@ class ReportController extends Controller
         $this->authorizeCoordinatorOrAdmin();
 
         $reportType = $request->input('report_type', 'coverage');
-        $dateFrom = $request->input('date_from', now()->startOfMonth());
-        $dateTo = $request->input('date_to', now()->endOfMonth());
+        $dateFrom   = Carbon::parse($request->input('date_from', now()->startOfMonth()));
+        $dateTo     = Carbon::parse($request->input('date_to', now()->endOfMonth()));
 
         $data = [];
         $view = null;
 
         if ($reportType === 'coverage') {
-            $query = Meeting::whereBetween('date_scheduled', [$dateFrom, $dateTo])->with('facility', 'assignments');
-            $data['totalMeetings'] = $query->count();
-            $data['assignedMeetings'] = $query->clone()->has('assignments')->count();
+            $assignments = MeetingAssignment::whereBetween('assignment_date', [$dateFrom, $dateTo])
+                ->with('meeting.facility')
+                ->get();
+
+            $data['totalMeetings']      = $assignments->count();
+            $data['assignedMeetings']   = $assignments->whereIn('status', ['confirmed', 'completed'])->count();
             $data['unassignedMeetings'] = $data['totalMeetings'] - $data['assignedMeetings'];
-            $data['dateFrom'] = $dateFrom;
-            $data['dateTo'] = $dateTo;
+            $data['dateFrom']           = $dateFrom;
+            $data['dateTo']             = $dateTo;
             $view = 'reports.coverage-summary-pdf';
         } elseif ($reportType === 'credentials') {
-            $data['credentials'] = Credential::where('status', 'active')
+            $data['credentials'] = VolunteerCredential::where('status', 'approved')
+                ->whereNotNull('expiration_date')
                 ->whereDate('expiration_date', '<=', now()->addDays(30))
-                ->with('volunteer.user')
+                ->with('volunteer', 'credentialType')
                 ->orderBy('expiration_date')
                 ->get();
             $view = 'reports.credentials-pdf';
@@ -234,13 +244,14 @@ class ReportController extends Controller
             return back()->with('error', 'Invalid report type.');
         }
 
-        $pdf = Pdf::loadView($view, $data);
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView($view, $data);
         return $pdf->download("chronosync-{$reportType}-" . now()->format('Y-m-d') . '.pdf');
     }
 
-    /**
-     * Convert array to CSV format.
-     */
+    // -------------------------------------------------------------------------
+    // Private helpers
+    // -------------------------------------------------------------------------
+
     private function arrayToCsv(array $data): string
     {
         if (empty($data)) {
@@ -248,11 +259,8 @@ class ReportController extends Controller
         }
 
         $output = fopen('php://memory', 'r+');
-
-        // Write headers
         fputcsv($output, array_keys($data[0]));
 
-        // Write rows
         foreach ($data as $row) {
             fputcsv($output, $row);
         }
@@ -264,75 +272,62 @@ class ReportController extends Controller
         return $csv;
     }
 
-    /**
-     * Get meetings data for export.
-     */
     private function getMeetingsData(Carbon $dateFrom, Carbon $dateTo): array
     {
-        return Meeting::whereBetween('date_scheduled', [$dateFrom, $dateTo])
-            ->with('facility', 'assignments.volunteer.user')
+        return MeetingAssignment::whereBetween('assignment_date', [$dateFrom, $dateTo])
+            ->with('meeting.facility', 'volunteer')
             ->get()
-            ->map(function ($meeting) {
-                $assigned = $meeting->assignments->first();
+            ->map(function ($assignment) {
                 return [
-                    'Facility' => $meeting->facility->name,
-                    'Date' => $meeting->date_scheduled->format('Y-m-d H:i'),
-                    'Type' => $meeting->meeting_type,
-                    'Status' => $meeting->status,
-                    'Volunteer' => $assigned?->volunteer->user->full_name ?? 'Unassigned',
+                    'Facility'  => $assignment->meeting->facility->facility_name,
+                    'Date'      => $assignment->assignment_date->format('Y-m-d'),
+                    'Time'      => substr($assignment->meeting->meeting_time, 0, 5),
+                    'Format'    => $assignment->meeting->format,
+                    'Status'    => $assignment->status,
+                    'Volunteer' => $assignment->volunteer?->full_name ?? 'Unassigned',
                 ];
             })
             ->toArray();
     }
 
-    /**
-     * Get credentials data for export.
-     */
     private function getCredentialsData(): array
     {
-        return Credential::where('status', 'active')
+        return VolunteerCredential::where('status', 'approved')
+            ->whereNotNull('expiration_date')
             ->whereDate('expiration_date', '<=', now()->addDays(30))
-            ->with('volunteer.user')
+            ->with('volunteer', 'credentialType')
             ->get()
             ->map(function ($credential) {
                 return [
-                    'Volunteer' => $credential->volunteer->user->full_name,
-                    'Type' => $credential->credential_type,
-                    'Expires' => $credential->expiration_date->format('Y-m-d'),
+                    'Volunteer' => $credential->volunteer->full_name,
+                    'Type'      => $credential->credentialType->name,
+                    'Expires'   => $credential->expiration_date->format('Y-m-d'),
                     'Days Until' => now()->diffInDays($credential->expiration_date),
                 ];
             })
             ->toArray();
     }
 
-    /**
-     * Get coverage data for export.
-     */
     private function getCoverageData(Carbon $dateFrom, Carbon $dateTo): array
     {
         return Facility::withoutTrashed()
-            ->with([
-                'meetings' => function ($q) use ($dateFrom, $dateTo) {
-                    $q->whereBetween('date_scheduled', [$dateFrom, $dateTo]);
-                },
-                'meetings.assignments',
-            ])
+            ->with(['meetings.assignments' => function ($q) use ($dateFrom, $dateTo) {
+                $q->whereBetween('assignment_date', [$dateFrom, $dateTo]);
+            }])
             ->get()
             ->map(function ($facility) {
-                $total = $facility->meetings->count();
-                $assigned = $facility->meetings
-                    ->filter(fn($m) => $m->assignments->count() > 0)
-                    ->count();
+                $assignments = $facility->meetings->flatMap->assignments;
+                $total   = $assignments->count();
+                $covered = $assignments->whereIn('status', ['confirmed', 'completed'])->count();
 
                 return [
-                    'Facility' => $facility->name,
-                    'Total Meetings' => $total,
-                    'Assigned' => $assigned,
-                    'Unassigned' => $total - $assigned,
-                    'Coverage %' => $total > 0 ? round(($assigned / $total) * 100, 1) : 0,
+                    'Facility'        => $facility->facility_name,
+                    'Total Meetings'  => $total,
+                    'Covered'         => $covered,
+                    'Uncovered'       => $total - $covered,
+                    'Coverage %'      => $total > 0 ? round(($covered / $total) * 100, 1) : 0,
                 ];
             })
             ->toArray();
     }
-
 }

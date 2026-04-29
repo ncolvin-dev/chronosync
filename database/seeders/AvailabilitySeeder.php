@@ -66,10 +66,11 @@ class AvailabilitySeeder extends Seeder
                 foreach ($slots as [$dayOfWeek, $hours]) {
                     foreach ($hours as $hourStart) {
                         Availability::create([
-                            'volunteer_id' => $volunteer->volunteer_id,
+                            'volunteer_id'  => $volunteer->volunteer_id,
                             'week_of_month' => $week,
                             'day_of_week'   => $dayOfWeek,
                             'hour_start'    => $hourStart,
+                            'hour_end'      => $hourStart + 1,
                             'is_available'  => true,
                         ]);
                     }

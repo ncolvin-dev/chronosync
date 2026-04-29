@@ -29,15 +29,13 @@
 
     .filter-group {
         display: flex;
-        gap: 1rem;
-        align-items: flex-end;
+        flex-direction: column;
+        gap: 0.25rem;
     }
 
     .form-label {
         font-weight: 600;
         color: #333;
-        margin-bottom: 0.5rem;
-        display: block;
         font-size: 0.875rem;
     }
 
@@ -72,13 +70,17 @@
         cursor: pointer;
         transition: all 0.3s;
         white-space: nowrap;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
     }
 
     .btn-action:hover {
         background-color: #003366;
+        color: white;
     }
 
-    /* Coverage Report Table */
     .report-table-container {
         background: white;
         border-radius: 0.75rem;
@@ -123,25 +125,10 @@
         font-weight: 600;
     }
 
-    .coverage-excellent {
-        background-color: #d4edda;
-        color: #155724;
-    }
-
-    .coverage-good {
-        background-color: #d1ecf1;
-        color: #0c5460;
-    }
-
-    .coverage-fair {
-        background-color: #fff3cd;
-        color: #856404;
-    }
-
-    .coverage-poor {
-        background-color: #f8d7da;
-        color: #721c24;
-    }
+    .coverage-excellent { background-color: #d4edda; color: #155724; }
+    .coverage-good      { background-color: #d1ecf1; color: #0c5460; }
+    .coverage-fair      { background-color: #fff3cd; color: #856404; }
+    .coverage-poor      { background-color: #f8d7da; color: #721c24; }
 
     .coverage-bar-container {
         width: 100px;
@@ -162,71 +149,10 @@
         font-size: 0.75rem;
     }
 
-    .coverage-bar.excellent {
-        background-color: #28a745;
-    }
-
-    .coverage-bar.good {
-        background-color: #0099cc;
-    }
-
-    .coverage-bar.fair {
-        background-color: #ffc107;
-    }
-
-    .coverage-bar.poor {
-        background-color: #dc3545;
-    }
-
-    /* Alerts Section -->
-    .alerts-section {
-        background: white;
-        border-radius: 0.75rem;
-        padding: 1.5rem;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-        margin-bottom: 2rem;
-        border-left: 4px solid #ffc107;
-    }
-
-    .alerts-title {
-        color: #003366;
-        font-weight: 700;
-        font-size: 1.1rem;
-        margin-bottom: 1.5rem;
-        padding-bottom: 1rem;
-        border-bottom: 2px solid #f0f0f0;
-    }
-
-    .alert-item {
-        padding: 1rem;
-        background-color: #fff3cd;
-        border-left: 3px solid #ffc107;
-        margin-bottom: 1rem;
-        border-radius: 0.5rem;
-    }
-
-    .alert-item:last-child {
-        margin-bottom: 0;
-    }
-
-    .alert-item-title {
-        font-weight: 600;
-        color: #856404;
-        margin-bottom: 0.25rem;
-    }
-
-    .alert-item-text {
-        color: #856404;
-        font-size: 0.9rem;
-    }
-
-    .empty-state {
-        text-align: center;
-        padding: 2rem;
-        background-color: #f8f9fa;
-        border-radius: 0.5rem;
-        color: #999;
-    }
+    .coverage-bar.excellent { background-color: #28a745; }
+    .coverage-bar.good      { background-color: #0099cc; }
+    .coverage-bar.fair      { background-color: #ffc107; }
+    .coverage-bar.poor      { background-color: #dc3545; }
 
     .report-summary {
         display: grid;
@@ -263,50 +189,26 @@
         margin-top: 0.5rem;
     }
 
+    .empty-state {
+        text-align: center;
+        padding: 2rem;
+        color: #999;
+    }
+
     @media (max-width: 1024px) {
-        .filter-section {
-            flex-direction: column;
-            align-items: stretch;
-        }
-
-        .filter-group {
-            width: 100%;
-        }
-
+        .filter-section   { flex-direction: column; align-items: stretch; }
+        .filter-group     { width: 100%; }
         .form-control,
-        .form-select {
-            width: 100%;
-        }
-
-        .action-buttons {
-            margin-left: 0;
-            flex-direction: column;
-        }
-
-        .btn-action {
-            width: 100%;
-        }
+        .form-select      { width: 100%; }
+        .action-buttons   { margin-left: 0; flex-direction: column; }
+        .btn-action       { width: 100%; justify-content: center; }
     }
 
     @media (max-width: 768px) {
-        .report-title {
-            font-size: 1.25rem;
-        }
-
-        .report-summary {
-            grid-template-columns: 1fr;
-        }
-
+        .report-title { font-size: 1.25rem; }
+        .report-summary { grid-template-columns: 1fr; }
         .report-table th,
-        .report-table td {
-            padding: 0.75rem 0.5rem;
-            font-size: 0.85rem;
-        }
-
-        .coverage-badge {
-            display: block;
-            margin-top: 0.5rem;
-        }
+        .report-table td { padding: 0.75rem 0.5rem; font-size: 0.85rem; }
     }
 </style>
 @endsection
@@ -320,231 +222,120 @@
                     <i class="fas fa-chart-bar"></i> Coverage Report
                 </h1>
                 <p style="color: #666; font-size: 0.9rem;">
-                    Volunteer coverage analysis by facility.
+                    Volunteer assignment coverage analysis by facility.
                 </p>
             </div>
 
-            <!-- Filters -->
-            <div class="filter-section">
-                <div class="filter-group">
-                    <label for="date-from" class="form-label">From Date</label>
-                    <input type="date" class="form-control" id="date-from" value="2026-03-01">
-                </div>
+            {{-- Filters --}}
+            <form method="GET" action="{{ route('reports.coverage-summary') }}" id="filter-form">
+                <div class="filter-section">
+                    <div class="filter-group">
+                        <label for="date-from" class="form-label">From Date</label>
+                        <input type="date" class="form-control" id="date-from" name="date_from"
+                               value="{{ $dateFrom->format('Y-m-d') }}">
+                    </div>
 
-                <div class="filter-group">
-                    <label for="date-to" class="form-label">To Date</label>
-                    <input type="date" class="form-control" id="date-to" value="2026-04-30">
-                </div>
+                    <div class="filter-group">
+                        <label for="date-to" class="form-label">To Date</label>
+                        <input type="date" class="form-control" id="date-to" name="date_to"
+                               value="{{ $dateTo->format('Y-m-d') }}">
+                    </div>
 
-                <div class="filter-group">
-                    <label for="facility" class="form-label">Facility</label>
-                    <select class="form-select" id="facility">
-                        <option value="">All Facilities</option>
-                        <option value="harmony">Harmony House</option>
-                        <option value="newpath">New Path Center</option>
-                        <option value="sunrise">Sunrise Community</option>
-                    </select>
+                    <div class="action-buttons">
+                        <button type="submit" class="btn-action">
+                            <i class="fas fa-sync"></i> Generate Report
+                        </button>
+                        <a href="{{ route('reports.export-pdf', ['report_type' => 'coverage', 'date_from' => $dateFrom->format('Y-m-d'), 'date_to' => $dateTo->format('Y-m-d')]) }}"
+                           class="btn-action">
+                            <i class="fas fa-file-pdf"></i> Export PDF
+                        </a>
+                        <a href="{{ route('reports.export-csv', ['report_type' => 'coverage', 'date_from' => $dateFrom->format('Y-m-d'), 'date_to' => $dateTo->format('Y-m-d')]) }}"
+                           class="btn-action">
+                            <i class="fas fa-download"></i> Export CSV
+                        </a>
+                    </div>
                 </div>
+            </form>
 
-                <div class="action-buttons">
-                    <button class="btn-action" onclick="generateReport()">
-                        <i class="fas fa-sync"></i> Generate Report
-                    </button>
-                    <button class="btn-action" onclick="exportPDF()">
-                        <i class="fas fa-file-pdf"></i> Export PDF
-                    </button>
-                    <button class="btn-action" onclick="exportCSV()">
-                        <i class="fas fa-download"></i> Export CSV
-                    </button>
-                </div>
-            </div>
-
-            <!-- Summary Cards -->
+            {{-- Summary Cards --}}
             <div class="report-summary">
                 <div class="summary-card">
-                    <div class="summary-label">Total Meetings</div>
-                    <div class="summary-value">34</div>
-                    <div class="summary-subtitle">March - April 2026</div>
+                    <div class="summary-label">Total Assignments</div>
+                    <div class="summary-value">{{ $totalMeetings }}</div>
+                    <div class="summary-subtitle">
+                        {{ $dateFrom->format('M j') }} – {{ $dateTo->format('M j, Y') }}
+                    </div>
                 </div>
                 <div class="summary-card">
-                    <div class="summary-label">Filled Meetings</div>
-                    <div class="summary-value">29</div>
-                    <div class="summary-subtitle">85.3% coverage</div>
+                    <div class="summary-label">Covered</div>
+                    <div class="summary-value">{{ $assignedMeetings }}</div>
+                    <div class="summary-subtitle">
+                        {{ $totalMeetings > 0 ? round(($assignedMeetings / $totalMeetings) * 100, 1) : 0 }}% confirmed or completed
+                    </div>
                 </div>
                 <div class="summary-card">
-                    <div class="summary-label">Unfilled Meetings</div>
-                    <div class="summary-value">5</div>
-                    <div class="summary-subtitle">14.7% gap</div>
+                    <div class="summary-label">Pending / Declined</div>
+                    <div class="summary-value">{{ $unassignedMeetings }}</div>
+                    <div class="summary-subtitle">need attention</div>
                 </div>
                 <div class="summary-card">
-                    <div class="summary-label">Average Coverage</div>
-                    <div class="summary-value">86%</div>
-                    <div class="summary-subtitle">All facilities</div>
+                    <div class="summary-label">Completed</div>
+                    <div class="summary-value">{{ $completedMeetings }}</div>
+                    <div class="summary-subtitle">meetings done</div>
                 </div>
             </div>
 
-            <!-- Coverage Table -->
+            {{-- Coverage Table --}}
             <div class="report-table-container">
                 <table class="report-table">
                     <thead>
                         <tr>
                             <th>Facility</th>
-                            <th>Total Meetings</th>
-                            <th>Filled</th>
-                            <th>Unfilled</th>
+                            <th>Total Assignments</th>
+                            <th>Covered</th>
+                            <th>Uncovered</th>
                             <th>Coverage %</th>
                             <th>Status</th>
                         </tr>
                     </thead>
                     <tbody>
-                        <tr>
-                            <td class="facility-name">Harmony House Treatment Center</td>
-                            <td>8</td>
-                            <td>8</td>
-                            <td>0</td>
-                            <td>
-                                <div class="coverage-bar-container">
-                                    <div class="coverage-bar excellent" style="width: 100%;">100%</div>
-                                </div>
-                            </td>
-                            <td>
-                                <span class="coverage-badge coverage-excellent">
-                                    <i class="fas fa-check-circle"></i> Excellent
-                                </span>
-                            </td>
-                        </tr>
-                        <tr>
-                            <td class="facility-name">New Path Recovery Center</td>
-                            <td>7</td>
-                            <td>6</td>
-                            <td>1</td>
-                            <td>
-                                <div class="coverage-bar-container">
-                                    <div class="coverage-bar good" style="width: 85.7%;">85.7%</div>
-                                </div>
-                            </td>
-                            <td>
-                                <span class="coverage-badge coverage-good">
-                                    <i class="fas fa-check"></i> Good
-                                </span>
-                            </td>
-                        </tr>
-                        <tr>
-                            <td class="facility-name">Sunrise Community Center</td>
-                            <td>6</td>
-                            <td>5</td>
-                            <td>1</td>
-                            <td>
-                                <div class="coverage-bar-container">
-                                    <div class="coverage-bar good" style="width: 83.3%;">83.3%</div>
-                                </div>
-                            </td>
-                            <td>
-                                <span class="coverage-badge coverage-good">
-                                    <i class="fas fa-check"></i> Good
-                                </span>
-                            </td>
-                        </tr>
-                        <tr>
-                            <td class="facility-name">Recovery Plus</td>
-                            <td>5</td>
-                            <td>4</td>
-                            <td>1</td>
-                            <td>
-                                <div class="coverage-bar-container">
-                                    <div class="coverage-bar fair" style="width: 80%;">80%</div>
-                                </div>
-                            </td>
-                            <td>
-                                <span class="coverage-badge coverage-fair">
-                                    <i class="fas fa-exclamation-circle"></i> Fair
-                                </span>
-                            </td>
-                        </tr>
-                        <tr>
-                            <td class="facility-name">Hope Treatment Center</td>
-                            <td>4</td>
-                            <td>4</td>
-                            <td>0</td>
-                            <td>
-                                <div class="coverage-bar-container">
-                                    <div class="coverage-bar excellent" style="width: 100%;">100%</div>
-                                </div>
-                            </td>
-                            <td>
-                                <span class="coverage-badge coverage-excellent">
-                                    <i class="fas fa-check-circle"></i> Excellent
-                                </span>
-                            </td>
-                        </tr>
-                        <tr>
-                            <td class="facility-name">Healing Community</td>
-                            <td>3</td>
-                            <td>2</td>
-                            <td>1</td>
-                            <td>
-                                <div class="coverage-bar-container">
-                                    <div class="coverage-bar fair" style="width: 66.7%;">66.7%</div>
-                                </div>
-                            </td>
-                            <td>
-                                <span class="coverage-badge coverage-fair">
-                                    <i class="fas fa-exclamation-circle"></i> Fair
-                                </span>
-                            </td>
-                        </tr>
-                        <tr>
-                            <td class="facility-name">Second Chance Center</td>
-                            <td>1</td>
-                            <td>0</td>
-                            <td>1</td>
-                            <td>
-                                <div class="coverage-bar-container">
-                                    <div class="coverage-bar poor" style="width: 0%;"></div>
-                                </div>
-                                0%
-                            </td>
-                            <td>
-                                <span class="coverage-badge coverage-poor">
-                                    <i class="fas fa-times-circle"></i> Poor
-                                </span>
-                            </td>
-                        </tr>
+                        @forelse ($coverageByFacility as $row)
+                            @php
+                                $pct = $row['coverage_percentage'];
+                                if ($pct >= 90)      { $tier = 'excellent'; $label = 'Excellent'; }
+                                elseif ($pct >= 75)  { $tier = 'good';      $label = 'Good'; }
+                                elseif ($pct >= 50)  { $tier = 'fair';      $label = 'Fair'; }
+                                else                 { $tier = 'poor';      $label = 'Poor'; }
+                            @endphp
+                            <tr>
+                                <td class="facility-name">{{ $row['facility_name'] }}</td>
+                                <td>{{ $row['total_meetings'] }}</td>
+                                <td>{{ $row['assigned'] }}</td>
+                                <td>{{ $row['unassigned'] }}</td>
+                                <td>
+                                    <div class="coverage-bar-container">
+                                        <div class="coverage-bar {{ $tier }}" style="width: {{ $pct }}%;">
+                                            {{ $pct }}%
+                                        </div>
+                                    </div>
+                                </td>
+                                <td>
+                                    <span class="coverage-badge coverage-{{ $tier }}">
+                                        {{ $label }}
+                                    </span>
+                                </td>
+                            </tr>
+                        @empty
+                            <tr>
+                                <td colspan="6" class="empty-state">
+                                    No assignment data for the selected date range.
+                                </td>
+                            </tr>
+                        @endforelse
                     </tbody>
                 </table>
             </div>
 
-            <!-- Credential Expiration Alerts -->
-            <div class="alerts-section">
-                <h2 class="alerts-title">
-                    <i class="fas fa-exclamation-triangle"></i> Credential Expiration Alerts
-                </h2>
-
-                <div class="alert-item">
-                    <div class="alert-item-title">
-                        <i class="fas fa-calendar"></i> Expiring Within 30 Days
-                    </div>
-                    <div class="alert-item-text">
-                        2 volunteer credentials expire within the next 30 days. Review and renew them to maintain facility compliance.
-                    </div>
-                    <ul style="margin-top: 0.75rem; margin-left: 1.5rem; color: #856404; font-size: 0.9rem;">
-                        <li><strong>Morgan Davis</strong> - Background Check - Expires April 8, 2026</li>
-                        <li><strong>Jordan Taylor</strong> - Reference Check - Expires April 15, 2026</li>
-                    </ul>
-                </div>
-
-                <div class="alert-item" style="background-color: #f8d7da; border-left-color: #dc3545; color: #721c24;">
-                    <div class="alert-item-title" style="color: #721c24;">
-                        <i class="fas fa-exclamation-circle"></i> Expired Credentials
-                    </div>
-                    <div class="alert-item-text" style="color: #721c24;">
-                        1 volunteer has an expired credential. This volunteer should not be assigned to meetings requiring this credential.
-                    </div>
-                    <ul style="margin-top: 0.75rem; margin-left: 1.5rem; color: #721c24; font-size: 0.9rem;">
-                        <li><strong>Sam Anderson</strong> - Background Check - Expired January 10, 2025</li>
-                    </ul>
-                </div>
-            </div>
         </div>
     </div>
 </div>
@@ -552,22 +343,17 @@
 
 @section('extra-scripts')
 <script>
-    function generateReport() {
-        const dateFrom = document.getElementById('date-from').value;
-        const dateTo = document.getElementById('date-to').value;
-        const facility = document.getElementById('facility').value;
+    // Keep export links in sync with the date pickers without a full page reload
+    document.getElementById('filter-form').addEventListener('change', function () {
+        const from = document.getElementById('date-from').value;
+        const to   = document.getElementById('date-to').value;
 
-        alert('Generating report for ' + dateFrom + ' to ' + dateTo + '...');
-    }
-
-    function exportPDF() {
-        alert('Exporting report as PDF...');
-        // In a real application, this would trigger a PDF download
-    }
-
-    function exportCSV() {
-        alert('Exporting report as CSV...');
-        // In a real application, this would trigger a CSV download
-    }
+        document.querySelectorAll('a.btn-action').forEach(function (link) {
+            const url = new URL(link.href);
+            url.searchParams.set('date_from', from);
+            url.searchParams.set('date_to', to);
+            link.href = url.toString();
+        });
+    });
 </script>
 @endsection

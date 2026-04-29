@@ -300,51 +300,6 @@
         color: white;
     }
 
-    .pagination {
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        gap: 0.35rem;
-        margin-top: 1.5rem;
-        padding-top: 1rem;
-        border-top: 1px solid #e0e0e0;
-        list-style: none;
-        padding-left: 0;
-        margin-bottom: 0;
-    }
-
-    .pagination li a,
-    .pagination li span {
-        display: inline-block;
-        padding: 0.5rem 0.85rem;
-        background-color: white;
-        border: 1px solid #ddd;
-        border-radius: 0.5rem;
-        transition: all 0.2s;
-        color: #003366;
-        text-decoration: none;
-        font-weight: 600;
-        font-size: 0.875rem;
-        line-height: 1;
-    }
-
-    .pagination li a:hover {
-        background-color: #0099cc;
-        border-color: #0099cc;
-        color: white;
-    }
-
-    .pagination li.active span {
-        background-color: #0099cc;
-        border-color: #0099cc;
-        color: white;
-    }
-
-    .pagination li.disabled span {
-        opacity: 0.45;
-        cursor: not-allowed;
-        color: #999;
-    }
 
     .empty-state {
         text-align: center;
@@ -466,28 +421,6 @@
         background-color: #3a4a60 !important;
     }
 
-    html.dark .pagination li a,
-    html.dark .pagination li span {
-        background-color: #1a2235 !important;
-        border-color: #2a3a50 !important;
-        color: #93c5fd !important;
-    }
-
-    html.dark .pagination li a:hover {
-        background-color: #1e3a5f !important;
-        border-color: #2a4a72 !important;
-        color: #bfdbfe !important;
-    }
-
-    html.dark .pagination li.active span {
-        background-color: #1e3a5f !important;
-        border-color: #2a4a72 !important;
-        color: #bfdbfe !important;
-    }
-
-    html.dark .pagination li.disabled span {
-        color: #475569 !important;
-    }
 
     html.dark .empty-state {
         background-color: #1a2235 !important;
@@ -619,10 +552,9 @@
                 @forelse($volunteers as $volunteer)
                 @php
                     $initials   = strtoupper(substr($volunteer->first_name, 0, 1) . substr($volunteer->last_name, 0, 1));
-                    $cleanYears = $volunteer->clean_date->diffInYears(now());
-                    $cleanMonths = $volunteer->clean_date->copy()->addYears($cleanYears)->diffInMonths(now());
-                    $cleanLabel = $cleanYears . ' yr' . ($cleanYears != 1 ? 's' : '')
-                                . ' ' . $cleanMonths . ' mo';
+                    $cleanYears  = (int) $volunteer->clean_date->diffInYears(now());
+                    $cleanMonths = (int) $volunteer->clean_date->copy()->addYears($cleanYears)->diffInMonths(now());
+                    $cleanLabel  = $cleanYears . ' yrs ' . $cleanMonths . ' mo';
                     $onProbation = $volunteer->probation_status === 'active_probation';
                 @endphp
                 <div class="volunteer-row">

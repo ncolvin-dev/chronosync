@@ -310,6 +310,104 @@
         }
     </style>
 
+    <style>
+        /*
+         * Pagination — global styles applied to every page.
+         *
+         * Laravel uses a custom pagination template at
+         * resources/views/vendor/pagination/default.blade.php which renders:
+         *   <ul class="pagination">
+         *     <li class="disabled">   ← prev/next when unavailable
+         *     <li>                    ← normal page link
+         *     <li class="active">     ← current page
+         *
+         * These styles override Bootstrap's default .pagination so the look
+         * is consistent with ChronoSync's navy/teal brand colours across
+         * volunteers, facilities, credentials, and matching pages.
+         */
+
+        /* Row of page buttons — centered with a dividing line above */
+        .pagination {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 0.35rem;
+            margin-top: 1.5rem;
+            padding-top: 1rem;
+            border-top: 1px solid #e0e0e0;
+            list-style: none;
+            padding-left: 0;
+            margin-bottom: 0;
+        }
+
+        /* Default button appearance — white pill with navy text */
+        .pagination li a,
+        .pagination li span {
+            display: inline-block;
+            padding: 0.5rem 0.85rem;
+            background-color: white;
+            border: 1px solid #ddd;
+            border-radius: 0.5rem;
+            transition: all 0.2s;
+            color: #003366;
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 0.875rem;
+            line-height: 1;
+        }
+
+        /* Hover — teal fill */
+        .pagination li a:hover {
+            background-color: #0099cc;
+            border-color: #0099cc;
+            color: white;
+        }
+
+        /* Current page — teal fill, no pointer needed */
+        .pagination li.active span {
+            background-color: #0099cc;
+            border-color: #0099cc;
+            color: white;
+        }
+
+        /* Disabled prev/next (on first or last page) — faded, no click */
+        .pagination li.disabled span {
+            opacity: 0.45;
+            cursor: not-allowed;
+            color: #999;
+        }
+
+        /* ── Dark mode overrides ── */
+
+        /* Default button in dark mode — dark surface, muted text */
+        html.dark .pagination li a,
+        html.dark .pagination li span {
+            background-color: #1e293b;
+            border-color: #334155;
+            color: #94a3b8;
+        }
+
+        /* Hover in dark mode — same teal as light mode */
+        html.dark .pagination li a:hover {
+            background-color: #0099cc;
+            border-color: #0099cc;
+            color: white;
+        }
+
+        /* Active page in dark mode — same teal as light mode */
+        html.dark .pagination li.active span {
+            background-color: #0099cc;
+            border-color: #0099cc;
+            color: white;
+        }
+
+        /* Disabled in dark mode — faded slate text */
+        html.dark .pagination li.disabled span {
+            opacity: 0.45;
+            color: #475569;
+        }
+    </style>
+
     @yield('extra-styles')
 </head>
 <body>

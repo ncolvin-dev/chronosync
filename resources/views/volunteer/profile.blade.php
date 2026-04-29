@@ -400,7 +400,7 @@
                             $years = (int)\Carbon\Carbon::parse($cleanDate)->diffInYears(\Carbon\Carbon::now());
                             $months = (int)\Carbon\Carbon::parse($cleanDate)->addYears($years)->diffInMonths(\Carbon\Carbon::now());
                         @endphp
-                        {{ $years }}y {{ $months }}m
+                        {{ $years }} yrs {{ $months }} mo
                     </span>
                 </div>
             </div>
@@ -707,7 +707,7 @@
                     <span class="audit-date">Profile Last Updated:</span> {{ $volunteer->updated_at->format('M j, Y g:i A') }}
                 </div>
                 <div class="audit-item">
-                    <span class="audit-date">Account Created:</span> {{ auth()->user()->created_at->format('M j, Y g:i A') }}
+                    <span class="audit-date">Account Created:</span> {{ $volunteer->created_at->format('M j, Y g:i A') }}
                 </div>
             </div>
         </div>

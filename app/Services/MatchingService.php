@@ -95,7 +95,7 @@ class MatchingService
     private function fetchAndScoreCandidates(Meeting $meeting): Collection
     {
         return Volunteer::withoutTrashed()
-            ->with(['user', 'assignments', 'credentials', 'availability'])
+            ->with(['assignments', 'credentials', 'availability'])
             ->get()
             ->map(fn(Volunteer $volunteer) => $this->scoreCandidate($volunteer, $meeting))
             ->filter(fn(array $candidate) => $candidate['match_score'] > 0)
