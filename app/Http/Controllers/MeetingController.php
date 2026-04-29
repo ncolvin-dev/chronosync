@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
+use App\Contracts\SnsTopicServiceInterface;
 use App\Jobs\SendSmsJob;
 use App\Models\AuditLog;
 use App\Models\Facility;
@@ -29,7 +30,10 @@ class MeetingController extends Controller
      * Injecting through the constructor decouples the controller from the concrete
      * implementation and makes it straightforward to swap or mock in tests.
      */
-    public function __construct(private readonly SmsService $smsService) {}
+    public function __construct(
+        private readonly SmsService $smsService,
+        private readonly SnsTopicServiceInterface $snsService,
+    ) {}
 
     /**
      * List recurring meeting slots with optional filters.
@@ -41,10 +45,41 @@ class MeetingController extends Controller
     {
         $this->authorizeCoordinatorOrAdmin();
 
+        $meetings = Meeting::with('facility')
+            ->withoutTrashed()
+            ->orderBy('status')
+            ->orderBy('day_of_week')
+            ->orderBy('week_of_month')
+            ->orderBy('meeting_time')
+            ->paginate(20);
+
+        $facilities = Facility::where('status', 'active')
+            ->orderBy('facility_name')
+            ->get();
+
+        $remindableMeetings = Meeting::with('facility')
+            ->withoutTrashed()
+            ->where('status', 'active')
+            ->whereHas('assignments', function ($q) {
+                $q->where('status', 'confirmed')
+                  ->where('assignment_date', '>=', now()->toDateString());
+            })
+            ->orderBy('day_of_week')
+            ->orderBy('week_of_month')
+            ->get();
+
+        return view('coordinator.meetings', compact('meetings', 'facilities', 'remindableMeetings'));
+    }
+
+    /**
+     * Volunteer assignment / matching view.
+     */
+    public function matching(Request $request)
+    {
+        $this->authorizeCoordinatorOrAdmin();
+
         $query = Meeting::with('facility')->withoutTrashed();
 
-        // Each filter is applied only when a value is present in the request.
-        // This keeps the query clean — unset filters add no WHERE clauses.
         if ($request->filled('facility_id')) {
             $query->where('facility_id', $request->facility_id);
         }
@@ -61,8 +96,6 @@ class MeetingController extends Controller
             $query->where('day_of_week', $request->day_of_week);
         }
 
-        // Assignment status filter checks whether upcoming occurrences have
-        // active assignments (confirmed or awaiting confirmation).
         if ($request->filled('assignment_status')) {
             $today = now()->toDateString();
             $this->applyAssignmentStatusFilter($query, $request->assignment_status, $today);
@@ -98,9 +131,14 @@ class MeetingController extends Controller
 
         $validated = $request->validate([
             'facility_id'       => 'required|exists:facilities,facility_id',
-            'day_of_week'       => 'required|integer|between:0,6',
-            'week_of_month'     => 'required|integer|between:1,5',
-            'meeting_time'      => 'required|date_format:H:i',
+            'meeting_type'      => 'required|in:recurring,one_off',
+            // One-off fields
+            'scheduled_time'    => 'required_if:meeting_type,one_off|nullable|date',
+            // Recurring fields
+            'day_of_week'       => 'required_if:meeting_type,recurring|nullable|integer|between:0,6',
+            'week_of_month'     => 'required_if:meeting_type,recurring|nullable|integer|between:1,5',
+            'meeting_time'      => 'required_if:meeting_type,recurring|nullable|date_format:H:i',
+            // Shared fields
             'duration_minutes'  => 'nullable|integer|min:15|max:480',
             'format'            => 'required|in:in_person,virtual,hybrid',
             'volunteers_needed' => 'required|integer|between:1,5',
@@ -108,17 +146,24 @@ class MeetingController extends Controller
         ]);
 
         return DB::transaction(function () use ($validated) {
-            $meeting = Meeting::create([
+            $meetingData = [
                 'facility_id'       => $validated['facility_id'],
-                'day_of_week'       => $validated['day_of_week'],
-                'week_of_month'     => $validated['week_of_month'],
-                'meeting_time'      => $validated['meeting_time'],
                 'duration_minutes'  => $validated['duration_minutes'] ?? 60,
                 'format'            => $validated['format'],
                 'volunteers_needed' => $validated['volunteers_needed'],
                 'notes'             => $validated['notes'] ?? null,
                 'status'            => 'active',
-            ]);
+            ];
+
+            if ($validated['meeting_type'] === 'one_off') {
+                $meetingData['scheduled_time'] = $validated['scheduled_time'];
+            } else {
+                $meetingData['day_of_week']   = $validated['day_of_week'];
+                $meetingData['week_of_month'] = $validated['week_of_month'];
+                $meetingData['meeting_time']  = $validated['meeting_time'];
+            }
+
+            $meeting = Meeting::create($meetingData);
 
             AuditLog::create([
                 'actor_user_id'  => auth()->id(),
@@ -128,8 +173,11 @@ class MeetingController extends Controller
                 'change_details' => ['created' => $meeting->toArray()],
             ]);
 
-            return redirect()->route('meetings.show', $meeting)
-                ->with('success', 'Recurring meeting slot created successfully.');
+            // Create the SNS topic for this meeting slot so it is ready for subscriptions.
+            $this->snsService->ensureTopicExists($meeting);
+
+            return redirect()->route('meetings.index')
+                ->with('success', 'Meeting created successfully.');
         });
     }
 
@@ -167,13 +215,92 @@ class MeetingController extends Controller
 
         $validated = $request->validate([
             'volunteer_id'    => 'required|exists:volunteers,volunteer_id',
-            'assignment_date' => 'required|date|after_or_equal:today',
+            'assignment_date' => 'nullable|date|after_or_equal:today',
             'assignment_type' => 'in:auto,manual',
             'override_reason' => 'nullable|string|max:500',
         ]);
 
-        $dateStr = $validated['assignment_date'];
-        $type    = $validated['assignment_type'] ?? 'manual';
+        $type             = $validated['assignment_type'] ?? 'manual';
+        $assignAllRecurring = $request->boolean('assign_all_recurring');
+
+        // When checked, assign to every active meeting that shares the same recurring schedule.
+        if ($assignAllRecurring && $meeting->day_of_week !== null) {
+            $siblings = Meeting::where('day_of_week', $meeting->day_of_week)
+                ->where('week_of_month', $meeting->week_of_month)
+                ->where('meeting_time', $meeting->meeting_time)
+                ->where('facility_id', $meeting->facility_id)
+                ->where('status', 'active')
+                ->get();
+
+            $assigned = 0;
+            $skipped  = 0;
+
+            foreach ($siblings as $sibling) {
+                $dateStr = $sibling->nextOccurrence()?->toDateString();
+
+                if (!$dateStr) { $skipped++; continue; }
+
+                if ($sibling->activeAssignmentsForDate($dateStr)->count() >= $sibling->volunteers_needed) {
+                    $skipped++; continue;
+                }
+
+                $alreadyAssigned = MeetingAssignment::where('meeting_id', $sibling->meeting_id)
+                    ->where('volunteer_id', $validated['volunteer_id'])
+                    ->where('assignment_date', $dateStr)
+                    ->whereIn('status', ['pending_confirmation', 'confirmed'])
+                    ->exists();
+
+                if ($alreadyAssigned) { $skipped++; continue; }
+
+                $a = DB::transaction(function () use ($validated, $sibling, $dateStr, $type) {
+                    $a = MeetingAssignment::create([
+                        'meeting_id'      => $sibling->meeting_id,
+                        'volunteer_id'    => $validated['volunteer_id'],
+                        'assignment_date' => $dateStr,
+                        'status'          => 'pending_confirmation',
+                        'assignment_type' => $type,
+                        'override_reason' => $validated['override_reason'] ?? null,
+                    ]);
+
+                    AuditLog::create([
+                        'actor_user_id'  => auth()->id(),
+                        'action'         => 'assign_volunteer',
+                        'entity_type'    => 'meeting_assignments',
+                        'entity_id'      => $a->meeting_assignment_id,
+                        'change_details' => [
+                            'volunteer_id'    => $validated['volunteer_id'],
+                            'meeting_id'      => $sibling->meeting_id,
+                            'assignment_date' => $dateStr,
+                            'assignment_type' => $type,
+                        ],
+                    ]);
+
+                    return $a;
+                });
+
+                if ($a->volunteer?->is_sms_deliverable) {
+                    SendSmsJob::dispatch($a, 'confirmation_request');
+                }
+
+                $this->snsService->syncSubscriptions($sibling);
+                $assigned++;
+            }
+
+            $msg = "Volunteer assigned to {$assigned} meeting(s).";
+            if ($skipped > 0) {
+                $msg .= " {$skipped} skipped (already assigned or at capacity).";
+            }
+
+            return back()->with('success', $msg);
+        }
+
+        // Single assignment — fall back to the meeting's next computed occurrence when no date supplied.
+        $dateStr = $validated['assignment_date']
+            ?? $meeting->nextOccurrence()?->toDateString();
+
+        if (!$dateStr) {
+            return back()->with('error', 'Could not determine the next occurrence date for this meeting.');
+        }
 
         // Guard: check the volunteer cap before touching the database.
         $current = $meeting->activeAssignmentsForDate($dateStr)->count();
@@ -219,12 +346,13 @@ class MeetingController extends Controller
             return $assignment;
         });
 
-        // SMS is dispatched after the transaction commits.
-        // A queued job means provider latency does not affect response time,
-        // and a provider outage cannot roll back the successfully saved assignment.
+        // SMS is dispatched after the transaction commits so provider latency
+        // cannot block the response or roll back the saved assignment.
         if ($assignment->volunteer?->is_sms_deliverable) {
             SendSmsJob::dispatch($assignment, 'confirmation_request');
         }
+
+        $this->snsService->syncSubscriptions($meeting);
 
         return back()->with('success', 'Volunteer assigned and confirmation request sent.');
     }
@@ -327,6 +455,11 @@ class MeetingController extends Controller
         // Only SMS the volunteer when a coordinator/admin is cancelling on their behalf.
         if ($isCoordinatorOrAdmin && $meetingAssignment->volunteer?->is_sms_deliverable) {
             SendSmsJob::dispatch($meetingAssignment, 'cancellation');
+        }
+
+        // Remove the cancelled volunteer from the SNS topic.
+        if ($meetingAssignment->meeting) {
+            $this->snsService->syncSubscriptions($meetingAssignment->meeting);
         }
 
         if ($request->expectsJson()) {
@@ -456,6 +589,76 @@ class MeetingController extends Controller
         });
     }
 
+    /**
+     * Return active meetings that have at least one confirmed upcoming volunteer — for the reminder dropdown.
+     */
+    public function remindable(Request $request)
+    {
+        $this->authorizeCoordinatorOrAdmin();
+
+        $meetings = Meeting::with('facility')
+            ->withoutTrashed()
+            ->where('status', 'active')
+            ->whereHas('assignments', function ($q) {
+                $q->where('status', 'confirmed')
+                  ->where('assignment_date', '>=', now()->toDateString());
+            })
+            ->orderBy('day_of_week')
+            ->orderBy('week_of_month')
+            ->get()
+            ->map(fn($m) => [
+                'url'   => route('meetings.send-reminder', $m),
+                'label' => ($m->facility->facility_name ?? '—') . ' — ' . $m->schedule_label,
+            ]);
+
+        return response()->json($meetings);
+    }
+
+    /**
+     * Return meeting data as JSON for the edit modal.
+     */
+    public function edit(Meeting $meeting)
+    {
+        $this->authorizeCoordinatorOrAdmin();
+
+        return response()->json($meeting->load('facility'));
+    }
+
+    /**
+     * Update an existing meeting slot.
+     */
+    public function update(Request $request, Meeting $meeting)
+    {
+        $this->authorizeCoordinatorOrAdmin();
+
+        $validated = $request->validate([
+            'facility_id'       => 'required|exists:facilities,facility_id',
+            'format'            => 'required|in:in_person,virtual,hybrid',
+            'volunteers_needed' => 'required|integer|between:1,5',
+            'duration_minutes'  => 'nullable|integer|min:15|max:480',
+            'notes'             => 'nullable|string|max:2000',
+            'day_of_week'       => 'nullable|integer|between:0,6',
+            'week_of_month'     => 'nullable|integer|between:1,5',
+            'meeting_time'      => 'nullable|date_format:H:i',
+            'scheduled_time'    => 'nullable|date',
+        ]);
+
+        $before = $meeting->only(['facility_id', 'day_of_week', 'week_of_month', 'meeting_time',
+                                  'scheduled_time', 'format', 'volunteers_needed', 'duration_minutes', 'notes']);
+
+        $meeting->update($validated);
+
+        AuditLog::create([
+            'actor_user_id'  => auth()->id(),
+            'action'         => 'update_meeting',
+            'entity_type'    => 'meetings',
+            'entity_id'      => $meeting->meeting_id,
+            'change_details' => ['before' => $before, 'after' => $validated],
+        ]);
+
+        return redirect()->route('meetings.index')->with('success', 'Meeting updated.');
+    }
+
     // -------------------------------------------------------------------------
     // Private helpers
     // -------------------------------------------------------------------------
@@ -493,14 +696,32 @@ class MeetingController extends Controller
     /**
      * Build the list of upcoming occurrence data for the show view.
      *
-     * Calculates the occurrence date for each of the next three calendar months
-     * using the meeting's day-of-week + week-of-month pattern, then loads the
-     * assignments already recorded for each date.
+     * One-off meetings return a single entry for their scheduled_time.
+     * Recurring meetings return entries for each of the next three months.
      *
      * @return array<int, array{date: \Carbon\Carbon, date_str: string, assignments: mixed, filled: int, needed: int}>
      */
     private function buildUpcomingOccurrences(Meeting $meeting): array
     {
+        if ($meeting->isOneOff()) {
+            $date = $meeting->scheduled_time;
+
+            if (!$date || $date->lt(now()->startOfDay())) {
+                return [];
+            }
+
+            $dateStr     = $date->toDateString();
+            $assignments = $meeting->assignmentsForDate($dateStr)->with('volunteer')->get();
+
+            return [[
+                'date'        => $date,
+                'date_str'    => $dateStr,
+                'assignments' => $assignments,
+                'filled'      => $assignments->whereIn('status', ['confirmed', 'pending_confirmation'])->count(),
+                'needed'      => $meeting->volunteers_needed,
+            ]];
+        }
+
         $now         = now();
         $occurrences = [];
 
@@ -509,7 +730,6 @@ class MeetingController extends Controller
             $month = $now->copy()->addMonths($monthOffset)->month;
             $date  = $meeting->occurrenceInMonth($year, $month);
 
-            // Skip months where the occurrence has already passed.
             if (!$date || $date->lt($now->startOfDay())) {
                 continue;
             }

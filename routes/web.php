@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Auth\AuthController;
+use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\AvailabilityController;
 use App\Http\Controllers\CoordinatorController;
 use App\Http\Controllers\CredentialController;
@@ -34,14 +35,6 @@ Route::middleware('guest')->group(function () {
     Route::get('/register', [VolunteerController::class, 'create'])->name('register');
     Route::post('/volunteers', [VolunteerController::class, 'store'])->name('volunteers.store');
 });
-
-/*
-|--------------------------------------------------------------------------
-| SMS Webhook (Unauthenticated)
-|--------------------------------------------------------------------------
-*/
-
-Route::post('/sms/webhook/response', [SmsController::class, 'handleResponse'])->name('sms.webhook');
 
 /*
 |--------------------------------------------------------------------------
@@ -180,6 +173,15 @@ Route::middleware(['auth', 'session_timeout'])->group(function () {
         Route::post('/meetings', [MeetingController::class, 'store'])
             ->name('meetings.store');
 
+        Route::get('/meetings/remindable', [MeetingController::class, 'remindable'])
+            ->name('meetings.remindable');
+
+        Route::get('/meetings/{meeting}/edit', [MeetingController::class, 'edit'])
+            ->name('meetings.edit');
+
+        Route::put('/meetings/{meeting}', [MeetingController::class, 'update'])
+            ->name('meetings.update');
+
         Route::get('/meetings/{meeting}', [MeetingController::class, 'show'])
             ->name('meetings.show');
 
@@ -277,7 +279,7 @@ Route::middleware(['auth', 'session_timeout'])->group(function () {
         Route::get('/sms/configure', [SmsController::class, 'configure'])
             ->name('sms.configure');
 
-        Route::post('/sms/configure', [SmsController::class, 'configure'])
+        Route::post('/sms/configure', [SmsController::class, 'store'])
             ->name('sms.configure.save');
 
         Route::post('/sms/retry-failed', [SmsController::class, 'retryFailed'])
@@ -321,9 +323,7 @@ Route::middleware(['auth', 'session_timeout'])->group(function () {
             ->name('coordinators.destroy');
 
         // System settings, user management, audit logs, etc.
-        Route::get('/admin/dashboard', function () {
-            return view('coordinator.dashboard');
-        })->name('admin.dashboard');
+        Route::get('/admin/dashboard', [DashboardController::class, 'index'])->name('admin.dashboard');
 
         Route::get('/admin/audit-logs', function () {
             return view('admin.audit-logs');
@@ -352,7 +352,7 @@ Route::fallback(function () {
 |
 */
 Route::redirect('/coordinator/dashboard', '/')->name('coordinator.dashboard');
-Route::redirect('/coordinator/matching', '/meetings')->name('coordinator.matching');
+Route::middleware(['auth', 'role:coordinator,admin'])->get('/coordinator/matching', [MeetingController::class, 'matching'])->name('coordinator.matching');
 Route::redirect('/coordinator/facilities', '/facilities')->name('coordinator.facilities');
 Route::redirect('/coordinator/volunteers', '/volunteers')->name('coordinator.volunteers');
 Route::redirect('/coordinator/coordinators', '/coordinators')->name('coordinator.coordinators');

@@ -11,6 +11,13 @@ return [
     |
     */
 
+    // SNS Topic Notifications
+    'sns' => [
+        'fake'         => env('SNS_FAKE', false),
+        'topic_prefix' => env('SNS_TOPIC_PREFIX', 'chronosync-meeting'),
+        'region'       => env('AWS_DEFAULT_REGION', 'us-east-1'),
+    ],
+
     // SMS Notification Settings
     'sms' => [
         'enabled' => env('SMS_ENABLED', true),
