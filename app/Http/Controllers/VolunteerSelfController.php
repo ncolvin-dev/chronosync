@@ -106,10 +106,47 @@ class VolunteerSelfController extends Controller
         $volunteer = $this->resolveVolunteer();
 
         if (!$volunteer) {
-            return redirect()->route('dashboard')->with('error', 'No volunteer record linked to your account.');
+            return redirect()->route('profile.edit');
         }
 
         return redirect("/volunteers/{$volunteer->volunteer_id}");
+    }
+
+    public function coordinatorProfile()
+    {
+        $user      = auth()->user();
+        $volunteer = $this->resolveVolunteer();
+
+        // Only show the full volunteer profile (with clean date, credentials, etc.)
+        // if the user actually has the volunteer role — i.e. was promoted from volunteer.
+        if ($volunteer && $user->hasRole('volunteer')) {
+            $volunteer->load('credentials.credentialType');
+            $readOnly = false;
+            return view('volunteer.profile', compact('volunteer', 'readOnly'));
+        }
+
+        // Pure coordinators use the stripped-down coordinator profile view,
+        // even if a Volunteer contact record exists (created when they saved name/phone).
+        $contact = $volunteer;
+        return view('coordinator.profile', compact('user', 'contact'));
+    }
+
+    public function coordinatorProfileUpdate(Request $request)
+    {
+        $validated = $request->validate([
+            'first_name' => 'required|string|max:100',
+            'last_name'  => 'required|string|max:100',
+            'phone'      => 'required|string|max:30',
+        ]);
+
+        $user = auth()->user();
+
+        Volunteer::updateOrCreate(
+            ['email' => $user->email],
+            array_merge($validated, ['email' => $user->email])
+        );
+
+        return redirect()->route('coordinator.profile')->with('success', 'Profile updated successfully.');
     }
 
     /**

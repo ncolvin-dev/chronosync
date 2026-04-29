@@ -352,7 +352,14 @@ class MeetingController extends Controller
             SendSmsJob::dispatch($assignment, 'confirmation_request');
         }
 
-        $this->snsService->syncSubscriptions($meeting);
+        try {
+            $this->snsService->syncSubscriptions($meeting);
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('SNS syncSubscriptions failed after assignment', [
+                'meeting_id' => $meeting->meeting_id,
+                'error'      => $e->getMessage(),
+            ]);
+        }
 
         return back()->with('success', 'Volunteer assigned and confirmation request sent.');
     }

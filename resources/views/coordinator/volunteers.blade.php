@@ -776,10 +776,11 @@
                 @forelse($volunteers as $volunteer)
                 @php
                     $initials   = strtoupper(substr($volunteer->first_name, 0, 1) . substr($volunteer->last_name, 0, 1));
-                    $cleanYears = (int) $volunteer->clean_date->diffInYears(now());
-                    $cleanMonths = (int) $volunteer->clean_date->copy()->addYears($cleanYears)->diffInMonths(now());
-                    $cleanLabel = $cleanYears . ' yr' . ($cleanYears != 1 ? 's' : '')
-                                . ' ' . $cleanMonths . ' mo';
+                    $cleanYears  = $volunteer->clean_date ? (int) $volunteer->clean_date->diffInYears(now()) : null;
+                    $cleanMonths = $volunteer->clean_date ? (int) $volunteer->clean_date->copy()->addYears($cleanYears)->diffInMonths(now()) : null;
+                    $cleanLabel  = $volunteer->clean_date
+                        ? ($cleanYears . ' yr' . ($cleanYears != 1 ? 's' : '') . ' ' . $cleanMonths . ' mo')
+                        : '—';
                     $onProbation = $volunteer->probation_status === 'active_probation';
                 @endphp
                 <div class="volunteer-row">

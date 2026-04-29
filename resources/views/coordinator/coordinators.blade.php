@@ -526,9 +526,11 @@
                 <h1 class="coordinators-title">
                     <i class="fas fa-user-tie"></i> Coordinator Management
                 </h1>
+                @if(auth()->user()->hasRole('admin'))
                 <button class="btn-add" onclick="openAddCoordinatorModal()">
                     <i class="fas fa-plus"></i> Add Coordinator
                 </button>
+                @endif
             </div>
 
             <!-- Search and Filters -->
@@ -571,16 +573,33 @@
             <div class="coordinators-list-container">
                 @forelse($coordinators as $coordinator)
                 @php
-                    $initial = strtoupper(substr($coordinator->email, 0, 1));
-                    $isAdmin = in_array('admin', $coordinator->roles ?? []);
-                    $isCoord = in_array('coordinator', $coordinator->roles ?? []);
-                    $isSelf  = auth()->id() === $coordinator->user_id;
+                    $initial  = strtoupper(substr($coordinator->email, 0, 1));
+                    $isAdmin  = in_array('admin', $coordinator->roles ?? []);
+                    $isCoord  = in_array('coordinator', $coordinator->roles ?? []);
+                    $isSelf   = auth()->id() === $coordinator->user_id;
+                    $contact  = $volunteerContacts[$coordinator->email] ?? null;
+                    $fullName = $contact ? trim($contact->first_name . ' ' . $contact->last_name) : null;
                 @endphp
-                <div class="coordinator-row">
+                <div class="coordinator-row{{ !auth()->user()->hasRole('admin') ? ' coordinator-row-clickable' : '' }}"
+                    @if(!auth()->user()->hasRole('admin'))
+                        onclick="openViewCoordinatorModal({{ json_encode([
+                            'email'   => $coordinator->email,
+                            'name'    => $fullName ?? $coordinator->email,
+                            'phone'   => $contact->phone ?? 'Not provided',
+                            'roles'   => $coordinator->roles ?? [],
+                        ]) }})"
+                        style="cursor:pointer;"
+                    @endif
+                >
                     <div class="coordinator-identity">
                         <div class="coordinator-avatar">{{ $initial }}</div>
                         <div>
-                            <div class="coordinator-email">{{ $coordinator->email }}</div>
+                            @if($fullName)
+                                <div style="font-weight:600;color:#003366;">{{ $fullName }}</div>
+                                <div class="coordinator-email">{{ $coordinator->email }}</div>
+                            @else
+                                <div class="coordinator-email">{{ $coordinator->email }}</div>
+                            @endif
                             <div style="margin-top: 0.3rem; display: flex; gap: 0.4rem; flex-wrap: wrap;">
                                 @if($isAdmin)
                                     <span class="role-badge role-admin"><i class="fas fa-shield-halved"></i> Admin</span>
@@ -591,6 +610,7 @@
                             </div>
                         </div>
                     </div>
+                    @if(auth()->user()->hasRole('admin'))
                     <div class="coordinator-details">
                         <div class="coord-info-item">
                             <div class="coord-info-label">Last Login</div>
@@ -603,8 +623,8 @@
                             <div class="coord-info-value">{{ $coordinator->created_at->format('M j, Y') }}</div>
                         </div>
                     </div>
-                    @php $canEdit = auth()->user()->hasRole('admin') || !$isAdmin; @endphp
-                    @if($canEdit)
+                    @endif
+                    @if(auth()->user()->hasRole('admin'))
                     <div class="coordinator-actions">
                         <button
                             class="btn-small btn-edit"
@@ -638,6 +658,37 @@
                 </div>
             </div>
             @endif
+        </div>
+    </div>
+</div>
+
+<!-- View Coordinator Modal (coordinator role only) -->
+<div class="coord-modal-overlay" id="viewCoordinatorModal">
+    <div class="coord-modal-dialog">
+        <div class="coord-modal-header">
+            <span class="coord-modal-title"><i class="fas fa-user-tie"></i> Coordinator Details</span>
+            <button class="coord-modal-close" onclick="closeViewCoordinatorModal()">×</button>
+        </div>
+        <div class="coord-modal-body">
+            <div class="coord-form-group">
+                <label class="coord-form-label">Name</label>
+                <div id="view_name" style="padding:0.5rem 0.75rem;background:#f0f4f8;border:1px solid #ddd;border-radius:0.5rem;font-size:0.875rem;color:#555;"></div>
+            </div>
+            <div class="coord-form-group">
+                <label class="coord-form-label">Email</label>
+                <div id="view_email" style="padding:0.5rem 0.75rem;background:#f0f4f8;border:1px solid #ddd;border-radius:0.5rem;font-size:0.875rem;color:#555;"></div>
+            </div>
+            <div class="coord-form-group">
+                <label class="coord-form-label">Phone</label>
+                <div id="view_phone" style="padding:0.5rem 0.75rem;background:#f0f4f8;border:1px solid #ddd;border-radius:0.5rem;font-size:0.875rem;color:#555;"></div>
+            </div>
+            <div class="coord-form-group">
+                <label class="coord-form-label">Role</label>
+                <div id="view_role" style="padding:0.5rem 0.75rem;background:#f0f4f8;border:1px solid #ddd;border-radius:0.5rem;font-size:0.875rem;color:#555;"></div>
+            </div>
+        </div>
+        <div class="coord-modal-footer">
+            <button type="button" class="btn-coord-secondary" onclick="closeViewCoordinatorModal()">Close</button>
         </div>
     </div>
 </div>
@@ -791,6 +842,23 @@
             e.preventDefault();
             first.focus();
         }
+    });
+
+    function openViewCoordinatorModal(data) {
+        const roles = (data.roles || []).map(r => r.charAt(0).toUpperCase() + r.slice(1)).join(', ');
+        document.getElementById('view_name').textContent  = data.name;
+        document.getElementById('view_email').textContent = data.email;
+        document.getElementById('view_phone').textContent = data.phone;
+        document.getElementById('view_role').textContent  = roles || '—';
+        document.getElementById('viewCoordinatorModal').classList.add('show');
+    }
+
+    function closeViewCoordinatorModal() {
+        document.getElementById('viewCoordinatorModal').classList.remove('show');
+    }
+
+    document.getElementById('viewCoordinatorModal').addEventListener('click', function(e) {
+        if (e.target === this) closeViewCoordinatorModal();
     });
 </script>
 @endsection

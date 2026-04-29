@@ -77,13 +77,18 @@ Route::middleware(['auth', 'session_timeout'])->group(function () {
     });
 
     // Coordinator/Admin only
-    Route::middleware('role:coordinator,admin')->group(function () {
-        Route::get('/coordinators', [CoordinatorController::class, 'index'])
-            ->name('coordinators.index');
+    Route::get('/coordinators', [CoordinatorController::class, 'index'])
+        ->middleware('role:coordinator,admin')
+        ->name('coordinators.index');
+
+    Route::middleware('role:admin')->group(function () {
         Route::post('/coordinators', [CoordinatorController::class, 'store'])
             ->name('coordinators.store');
         Route::patch('/coordinators/{user}', [CoordinatorController::class, 'update'])
             ->name('coordinators.update');
+    });
+
+    Route::middleware('role:coordinator,admin')->group(function () {
 
         Route::get('/volunteers', [VolunteerController::class, 'index'])
             ->name('volunteers.index');
@@ -318,13 +323,15 @@ Route::middleware(['auth', 'session_timeout'])->group(function () {
     |----------------------------------------------------------------------
     */
 
+    Route::get('/admin/dashboard', [DashboardController::class, 'index'])
+        ->middleware('role:coordinator,admin')
+        ->name('admin.dashboard');
+
     Route::middleware('role:admin')->group(function () {
         Route::delete('/coordinators/{user}', [CoordinatorController::class, 'destroy'])
             ->name('coordinators.destroy');
 
         // System settings, user management, audit logs, etc.
-        Route::get('/admin/dashboard', [DashboardController::class, 'index'])->name('admin.dashboard');
-
         Route::get('/admin/audit-logs', function () {
             return view('admin.audit-logs');
         })->name('admin.audit-logs');
@@ -375,6 +382,12 @@ Route::redirect('/volunteer/dashboard', '/')->name('volunteer.dashboard');
 
 Route::get('/volunteer/profile', [VolunteerSelfController::class, 'profileRedirect'])
     ->middleware(['auth', 'session_timeout'])->name('volunteer.profile');
+
+Route::get('/coordinator/profile', [VolunteerSelfController::class, 'coordinatorProfile'])
+    ->middleware(['auth', 'session_timeout'])->name('coordinator.profile');
+
+Route::put('/coordinator/profile', [VolunteerSelfController::class, 'coordinatorProfileUpdate'])
+    ->middleware(['auth', 'session_timeout'])->name('coordinator.profile.update');
 
 Route::put('/volunteer/profile/update', [VolunteerSelfController::class, 'updateProfile'])
     ->middleware(['auth', 'session_timeout'])->name('volunteer.profile.update');

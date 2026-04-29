@@ -412,110 +412,92 @@
 </head>
 <body>
     <!-- Navigation -->
-    <nav class="navbar navbar-expand-lg navbar-dark fixed-top">
-        <div class="container-fluid">
-            <a class="navbar-brand" href="{{ route('home') }}">
+    <!-- Drawer overlay -->
+    <div id="drawerOverlay" onclick="closeDrawer()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:1040;"></div>
+
+    <!-- Slide-out nav drawer -->
+    <div id="navDrawer" style="position:fixed;top:0;left:0;height:100%;width:260px;background:#003366;z-index:1050;transform:translateX(-100%);transition:transform 0.25s ease;display:flex;flex-direction:column;overflow-y:auto;">
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:1.1rem 1.25rem;border-bottom:1px solid rgba(255,255,255,0.12);">
+            <span style="color:white;font-weight:700;font-size:1.05rem;"><i class="fas fa-clock-list"></i> ChronoSync</span>
+            <button onclick="closeDrawer()" style="background:none;border:none;color:rgba(255,255,255,0.7);font-size:1.3rem;cursor:pointer;line-height:1;">×</button>
+        </div>
+        <nav style="flex:1;padding:0.5rem 0;">
+            @auth
+                @if(auth()->user()->hasRole('volunteer') && !auth()->user()->hasAnyRole(['coordinator', 'admin']))
+                    <a class="drawer-link {{ request()->routeIs('volunteer.dashboard') ? 'drawer-active' : '' }}" href="{{ route('volunteer.dashboard') }}"><i class="fas fa-home"></i> Dashboard</a>
+                    <a class="drawer-link {{ request()->routeIs('volunteer.availability') ? 'drawer-active' : '' }}" href="{{ route('volunteer.availability') }}"><i class="fas fa-calendar"></i> Availability</a>
+                    <a class="drawer-link {{ request()->routeIs('volunteer.assignments') ? 'drawer-active' : '' }}" href="{{ route('volunteer.assignments') }}"><i class="fas fa-tasks"></i> Assignments</a>
+                    <a class="drawer-link {{ request()->routeIs('volunteer.profile') ? 'drawer-active' : '' }}" href="{{ route('volunteer.profile') }}"><i class="fas fa-user"></i> Profile</a>
+                    <a class="drawer-link {{ request()->routeIs('profile.edit') ? 'drawer-active' : '' }}" href="{{ route('profile.edit') }}"><i class="fas fa-cog"></i> Settings</a>
+                @elseif(auth()->user()->hasAnyRole(['coordinator', 'admin']))
+                    <a class="drawer-link {{ request()->routeIs('coordinator.dashboard') ? 'drawer-active' : '' }}" href="{{ route('coordinator.dashboard') }}"><i class="fas fa-chart-line"></i> Dashboard</a>
+                    <a class="drawer-link {{ request()->routeIs('coordinator.facilities') ? 'drawer-active' : '' }}" href="{{ route('coordinator.facilities') }}"><i class="fas fa-building"></i> Facilities</a>
+                    <a class="drawer-link {{ request()->routeIs('coordinator.volunteers') ? 'drawer-active' : '' }}" href="{{ route('coordinator.volunteers') }}"><i class="fas fa-users"></i> Volunteers</a>
+                    <a class="drawer-link {{ request()->routeIs('coordinator.coordinators') ? 'drawer-active' : '' }}" href="{{ route('coordinator.coordinators') }}"><i class="fas fa-user-tie"></i> Coordinators</a>
+                    <a class="drawer-link {{ request()->routeIs('meetings.index') ? 'drawer-active' : '' }}" href="{{ route('meetings.index') }}"><i class="fas fa-calendar-alt"></i> Meetings</a>
+                    <a class="drawer-link {{ request()->routeIs('coordinator.matching') ? 'drawer-active' : '' }}" href="{{ route('coordinator.matching') }}"><i class="fas fa-link"></i> Matching</a>
+                    <a class="drawer-link {{ request()->routeIs('coordinator.credentials') ? 'drawer-active' : '' }}" href="{{ route('coordinator.credentials') }}"><i class="fas fa-certificate"></i> Credentials</a>
+                    <div style="padding:0.35rem 1.25rem;font-size:0.7rem;text-transform:uppercase;letter-spacing:0.08em;color:rgba(255,255,255,0.4);margin-top:0.5rem;">Reports</div>
+                    <a class="drawer-link {{ request()->routeIs('reports.coverage') ? 'drawer-active' : '' }}" href="{{ route('reports.coverage') }}"><i class="fas fa-file-alt"></i> Coverage Report</a>
+                    <a class="drawer-link {{ request()->routeIs('coordinator.sms-config') ? 'drawer-active' : '' }}" href="{{ route('coordinator.sms-config') }}"><i class="fas fa-sms"></i> SMS Configuration</a>
+                    <div style="height:1px;background:rgba(255,255,255,0.1);margin:0.5rem 1.25rem;"></div>
+                    <a class="drawer-link {{ request()->routeIs('coordinator.profile') ? 'drawer-active' : '' }}" href="{{ route('coordinator.profile') }}"><i class="fas fa-user"></i> Profile</a>
+                @endif
+            @endauth
+        </nav>
+        @auth
+        <div style="padding:0.75rem 1.25rem;border-top:1px solid rgba(255,255,255,0.12);">
+            <form method="POST" action="{{ route('logout') }}">
+                @csrf
+                <button type="submit" style="background:none;border:none;color:rgba(255,255,255,0.75);font-size:0.9rem;cursor:pointer;padding:0;width:100%;text-align:left;">
+                    <i class="fas fa-sign-out-alt"></i> Logout
+                </button>
+            </form>
+        </div>
+        @endauth
+    </div>
+
+    <nav class="navbar navbar-dark fixed-top" style="padding:0.6rem 1rem;">
+        <div class="container-fluid" style="gap:1rem;">
+            @unless(request()->routeIs('login', 'register'))
+            <button onclick="openDrawer()" style="background:none;border:none;color:white;font-size:1.35rem;cursor:pointer;padding:0.25rem;line-height:1;" aria-label="Open menu">
+                <i class="fas fa-bars"></i>
+            </button>
+            @endunless
+            <a class="navbar-brand mb-0" href="{{ route('home') }}" style="margin:0;">
                 <i class="fas fa-clock-list"></i> ChronoSync
             </a>
-            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
-                <span class="navbar-toggler-icon"></span>
-            </button>
-            <div class="collapse navbar-collapse" id="navbarNav">
-                <ul class="navbar-nav ms-auto">
-                    @auth
-                        @if(auth()->user()->hasRole('volunteer') && !auth()->user()->hasAnyRole(['coordinator', 'admin']))
-                            <li class="nav-item">
-                                <a class="nav-link {{ request()->routeIs('volunteer.dashboard') ? 'active' : '' }}" href="{{ route('volunteer.dashboard') }}">
-                                    <i class="fas fa-home"></i> Dashboard
-                                </a>
-                            </li>
-                            <li class="nav-item">
-                                <a class="nav-link {{ request()->routeIs('volunteer.availability') ? 'active' : '' }}" href="{{ route('volunteer.availability') }}">
-                                    <i class="fas fa-calendar"></i> Availability
-                                </a>
-                            </li>
-                            <li class="nav-item">
-                                <a class="nav-link {{ request()->routeIs('volunteer.assignments') ? 'active' : '' }}" href="{{ route('volunteer.assignments') }}">
-                                    <i class="fas fa-tasks"></i> Assignments
-                                </a>
-                            </li>
-                            <li class="nav-item">
-                                <a class="nav-link {{ request()->routeIs('volunteer.profile') ? 'active' : '' }}" href="{{ route('volunteer.profile') }}">
-                                    <i class="fas fa-user"></i> Profile
-                                </a>
-                            </li>
-                            <li class="nav-item">
-                                <a class="nav-link {{ request()->routeIs('profile.edit') ? 'active' : '' }}" href="{{ route('profile.edit') }}">
-                                    <i class="fas fa-cog"></i> Settings
-                                </a>
-                            </li>
-                        @elseif(auth()->user()->hasAnyRole(['coordinator', 'admin']))
-                            <li class="nav-item">
-                                <a class="nav-link {{ request()->routeIs('coordinator.dashboard') ? 'active' : '' }}" href="{{ route('coordinator.dashboard') }}">
-                                    <i class="fas fa-chart-line"></i> Dashboard
-                                </a>
-                            </li>
-                            <li class="nav-item">
-                                <a class="nav-link {{ request()->routeIs('coordinator.facilities') ? 'active' : '' }}" href="{{ route('coordinator.facilities') }}">
-                                    <i class="fas fa-building"></i> Facilities
-                                </a>
-                            </li>
-                            <li class="nav-item">
-                                <a class="nav-link {{ request()->routeIs('coordinator.volunteers') ? 'active' : '' }}" href="{{ route('coordinator.volunteers') }}">
-                                    <i class="fas fa-users"></i> Volunteers
-                                </a>
-                            </li>
-                            <li class="nav-item">
-                                <a class="nav-link {{ request()->routeIs('coordinator.coordinators') ? 'active' : '' }}" href="{{ route('coordinator.coordinators') }}">
-                                    <i class="fas fa-user-tie"></i> Coordinators
-                                </a>
-                            </li>
-                            <li class="nav-item">
-                                <a class="nav-link {{ request()->routeIs('meetings.index') ? 'active' : '' }}" href="{{ route('meetings.index') }}">
-                                    <i class="fas fa-calendar-alt"></i> Meetings
-                                </a>
-                            </li>
-                            <li class="nav-item">
-                                <a class="nav-link {{ request()->routeIs('coordinator.matching') ? 'active' : '' }}" href="{{ route('coordinator.matching') }}">
-                                    <i class="fas fa-link"></i> Matching
-                                </a>
-                            </li>
-                            <li class="nav-item">
-                                <a class="nav-link {{ request()->routeIs('coordinator.credentials') ? 'active' : '' }}" href="{{ route('coordinator.credentials') }}">
-                                    <i class="fas fa-certificate"></i> Credentials
-                                </a>
-                            </li>
-                            <li class="nav-item dropdown">
-                                <a class="nav-link dropdown-toggle" href="#" id="reportsDropdown" role="button" data-bs-toggle="dropdown">
-                                    <i class="fas fa-file-chart-line"></i> Reports
-                                </a>
-                                <ul class="dropdown-menu" aria-labelledby="reportsDropdown">
-                                    <li><a class="dropdown-item" href="{{ route('reports.coverage') }}">Coverage Report</a></li>
-                                    <li><a class="dropdown-item" href="{{ route('coordinator.sms-config') }}">SMS Configuration</a></li>
-                                </ul>
-                            </li>
-                        @endif
-
-                        <li class="nav-item">
-                            <form method="POST" action="{{ route('logout') }}">
-                                @csrf
-                                <button type="submit" class="nav-link btn btn-link">
-                                    <i class="fas fa-sign-out-alt"></i> Logout
-                                </button>
-                            </form>
-                        </li>
-                    @else
-                        <li class="nav-item">
-                            <a class="nav-link" href="{{ route('login') }}">Login</a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" href="{{ route('register') }}">Sign Up</a>
-                        </li>
-                    @endauth
-                </ul>
-            </div>
         </div>
     </nav>
+
+    <style>
+        .drawer-link {
+            display: block;
+            padding: 0.7rem 1.25rem;
+            color: rgba(255,255,255,0.82);
+            text-decoration: none;
+            font-size: 0.92rem;
+            transition: background 0.15s, color 0.15s;
+        }
+        .drawer-link i { width: 1.25rem; }
+        .drawer-link:hover { background: rgba(255,255,255,0.08); color: white; }
+        .drawer-active { background: rgba(0,153,204,0.25); color: white; border-left: 3px solid #0099cc; }
+        html.dark #navDrawer { background: #0f172a; }
+    </style>
+
+    <script>
+        function openDrawer() {
+            document.getElementById('navDrawer').style.transform = 'translateX(0)';
+            document.getElementById('drawerOverlay').style.display = 'block';
+            document.body.style.overflow = 'hidden';
+        }
+        function closeDrawer() {
+            document.getElementById('navDrawer').style.transform = 'translateX(-100%)';
+            document.getElementById('drawerOverlay').style.display = 'none';
+            document.body.style.overflow = '';
+        }
+        document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDrawer(); });
+    </script>
 
     <!-- Flash Messages -->
     @if($errors->any())

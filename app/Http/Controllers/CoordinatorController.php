@@ -30,6 +30,12 @@ class CoordinatorController extends Controller
 
         $coordinators = $query->orderBy('email')->paginate(15);
 
+        // Attach volunteer contact info (name, phone) keyed by email
+        $coordinatorEmails = $coordinators->pluck('email')->toArray();
+        $volunteerContacts = Volunteer::whereIn('email', $coordinatorEmails)
+            ->get(['email', 'first_name', 'last_name', 'phone'])
+            ->keyBy('email');
+
         // Volunteers not already holding a coordinator/admin role
         $existingCoordEmails = User::where(function ($q) {
             $q->whereJsonContains('roles', 'coordinator')
@@ -41,7 +47,7 @@ class CoordinatorController extends Controller
             ->orderBy('first_name')
             ->get();
 
-        return view('coordinator.coordinators', compact('coordinators', 'promotableVolunteers'));
+        return view('coordinator.coordinators', compact('coordinators', 'promotableVolunteers', 'volunteerContacts'));
     }
 
     public function store(Request $request)
