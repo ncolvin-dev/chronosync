@@ -2,165 +2,109 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Meeting;
-use App\Models\MeetingAssignment;
-use App\Models\SmsLog;
+use App\Contracts\SnsTopicServiceInterface;
 use App\Models\AuditLog;
+use App\Models\Meeting;
+use App\Models\SmsConfig;
+use App\Models\SmsLog;
 use App\Services\SmsService;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
 class SmsController extends Controller
 {
     protected SmsService $smsService;
+    protected SnsTopicServiceInterface $snsTopicService;
 
-    public function __construct(SmsService $smsService)
+    public function __construct(SmsService $smsService, SnsTopicServiceInterface $snsTopicService)
     {
-        $this->smsService = $smsService;
+        $this->smsService      = $smsService;
+        $this->snsTopicService = $snsTopicService;
     }
 
     /**
-     * Configure SMS settings.
+     * Show the SMS configuration form.
      */
-    public function configure(Request $request)
+    public function configure()
     {
         $this->authorizeAdmin();
 
-        if ($request->method === 'GET') {
-            $settings = [
-                'sms_provider' => config('services.sms.provider'),
-                'sms_enabled' => config('services.sms.enabled'),
-                'reminder_hours_before' => config('services.sms.reminder_hours_before'),
-                'api_key' => '****' . substr(config('services.sms.api_key'), -4),
-            ];
+        $config = SmsConfig::current();
 
-            return view('coordinator.sms-config', compact('settings'));
-        }
-
-        $validated = $request->validate([
-            'sms_provider' => 'required|in:twilio,aws_sns,custom',
-            'sms_enabled' => 'boolean',
-            'reminder_hours_before' => 'integer|min:1|max:72',
-            'api_key' => 'nullable|string|min:10',
-        ]);
-
-        // Update environment variables or config
-        $this->updateSmsConfig($validated);
-
-        AuditLog::create([
-            'user_id' => auth()->id(),
-            'action' => 'sms_settings_updated',
-            'model_type' => 'SmsConfiguration',
-            'model_id' => 1,
-            'changes' => [
-                'provider' => $validated['sms_provider'],
-                'enabled' => $validated['sms_enabled'],
-                'reminder_hours' => $validated['reminder_hours_before'],
-            ],
-        ]);
-
-        return back()->with('success', 'SMS settings updated successfully.');
+        return view('coordinator.sms-config', compact('config'));
     }
 
     /**
-     * Manually trigger reminder SMS.
+     * Persist SMS configuration to the database.
+     */
+    public function store(Request $request)
+    {
+        $this->authorizeAdmin();
+
+        $validated = $request->validate([
+            'hours_before'     => 'required|integer|min:1|max:72',
+            'minutes_buffer'   => 'required|integer|min:0|max:120',
+            'window_start'     => 'required|date_format:H:i',
+            'window_end'       => 'required|date_format:H:i',
+            'message_template' => 'required|string|max:320',
+        ]);
+
+        $config = SmsConfig::current();
+
+        $config->update([
+            'hours_before_meeting' => $validated['hours_before'],
+            'buffer_minutes'       => $validated['minutes_buffer'],
+            'daytime_start'        => (int) substr($validated['window_start'], 0, 2),
+            'daytime_end'          => (int) substr($validated['window_end'], 0, 2),
+            'message_template'     => $validated['message_template'],
+        ]);
+
+        AuditLog::create([
+            'actor_user_id' => auth()->id(),
+            'action'        => 'sms_config_updated',
+            'entity_type'   => SmsConfig::class,
+            'entity_id'     => $config->config_id,
+            'change_details' => [
+                'hours_before_meeting' => $config->hours_before_meeting,
+                'buffer_minutes'       => $config->buffer_minutes,
+                'daytime_start'        => $config->daytime_start,
+                'daytime_end'          => $config->daytime_end,
+            ],
+        ]);
+
+        return back()->with('success', 'SMS configuration saved.');
+    }
+
+    /**
+     * Publish a reminder to all confirmed volunteers on a meeting's SNS topic.
      */
     public function sendReminder(Request $request, Meeting $meeting)
     {
         $this->authorizeCoordinatorOrAdmin();
 
-        $assignment = $meeting->assignments()
+        $confirmedCount = $meeting->assignments()
             ->where('status', 'confirmed')
-            ->first();
+            ->count();
 
-        if (!$assignment) {
-            return back()->with('error', 'No volunteer assigned to this meeting.');
+        if ($confirmedCount === 0) {
+            return back()->with('error', 'No confirmed volunteers on this meeting.');
         }
 
-        return DB::transaction(function () use ($assignment) {
-            $result = $this->smsService->sendReminder($assignment);
+        $config  = SmsConfig::current();
+        $message = $this->buildReminderMessage($meeting, $config->message_template);
 
-            if ($result) {
-                AuditLog::create([
-                    'user_id' => auth()->id(),
-                    'action' => 'reminder_sms_sent',
-                    'model_type' => MeetingAssignment::class,
-                    'model_id' => $assignment->id,
-                    'changes' => ['sent_at' => now()],
-                ]);
+        $this->snsTopicService->publish($meeting, $message);
 
-                return back()->with('success', 'Reminder SMS sent successfully.');
-            }
+        AuditLog::create([
+            'actor_user_id'  => auth()->id(),
+            'action'         => 'reminder_sms_published',
+            'entity_type'    => Meeting::class,
+            'entity_id'      => $meeting->meeting_id,
+            'change_details' => ['sent_at' => now(), 'message' => $message],
+        ]);
 
-            return back()->with('error', 'Failed to send reminder SMS.');
-        });
-    }
-
-    /**
-     * Handle incoming SMS responses (webhook).
-     */
-    public function handleResponse(Request $request)
-    {
-        // Validate webhook authenticity
-        $this->validateWebhookSignature($request);
-
-        $phoneNumber = $request->input('from');
-        $responseText = trim(strtoupper($request->input('body')));
-
-        $smsLog = SmsLog::where('to_phone', $phoneNumber)
-            ->where('sms_type', 'confirmation_request')
-            ->latest()
-            ->first();
-
-        if (!$smsLog) {
-            return response()->json(['success' => false, 'message' => 'No matching SMS record']);
-        }
-
-        return DB::transaction(function () use ($smsLog, $responseText) {
-            $assignment = MeetingAssignment::find($smsLog->assignment_id);
-
-            if (!$assignment) {
-                return response()->json(['success' => false, 'message' => 'Assignment not found']);
-            }
-
-            if ($responseText === 'YES' || $responseText === 'Y') {
-                $assignment->status = 'confirmed';
-                $assignment->confirmed_at = now();
-
-                AuditLog::create([
-                    'user_id' => $assignment->volunteer_id,
-                    'action' => 'volunteer_confirmed_assignment',
-                    'model_type' => MeetingAssignment::class,
-                    'model_id' => $assignment->id,
-                    'changes' => ['confirmation' => 'yes_via_sms'],
-                ]);
-            } elseif ($responseText === 'NO' || $responseText === 'N') {
-                $assignment->status = 'declined';
-                $assignment->declined_at = now();
-
-                AuditLog::create([
-                    'user_id' => $assignment->volunteer_id,
-                    'action' => 'volunteer_declined_assignment',
-                    'model_type' => MeetingAssignment::class,
-                    'model_id' => $assignment->id,
-                    'changes' => ['confirmation' => 'no_via_sms'],
-                ]);
-            } else {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Invalid response. Reply YES or NO.',
-                ]);
-            }
-
-            $assignment->save();
-
-            $smsLog->response_received = true;
-            $smsLog->response_text = $responseText;
-            $smsLog->response_received_at = now();
-            $smsLog->save();
-
-            return response()->json(['success' => true, 'message' => 'Response recorded']);
-        });
+        return back()->with('success', 'Reminder sent to all confirmed volunteers.');
     }
 
     /**
@@ -172,23 +116,19 @@ class SmsController extends Controller
 
         $query = SmsLog::query();
 
-        // Filter by assignment
         if ($request->filled('assignment_id')) {
             $query->where('assignment_id', $request->assignment_id);
         }
 
-        // Filter by status
         if ($request->filled('status')) {
-            if ($request->status === 'sent') {
-                $query->where('is_sent', true);
-            } elseif ($request->status === 'failed') {
-                $query->where('is_sent', false);
-            } elseif ($request->status === 'responded') {
-                $query->where('response_received', true);
-            }
+            match ($request->status) {
+                'sent'      => $query->where('is_sent', true),
+                'failed'    => $query->where('is_sent', false),
+                'responded' => $query->where('response_received', true),
+                default     => null,
+            };
         }
 
-        // Filter by date range
         if ($request->filled('date_from')) {
             $query->whereDate('created_at', '>=', $request->date_from);
         }
@@ -209,7 +149,7 @@ class SmsController extends Controller
     {
         $this->authorizeAdmin();
 
-        $failedLogs = SmsLog::where('is_sent', false)
+        $failedLogs   = SmsLog::where('is_sent', false)
             ->where('created_at', '>=', now()->subDays(7))
             ->get();
 
@@ -231,11 +171,10 @@ class SmsController extends Controller
             }
 
             AuditLog::create([
-                'user_id' => auth()->id(),
-                'action' => 'sms_retry_batch',
-                'model_type' => 'SmsLog',
-                'model_id' => 0,
-                'changes' => [
+                'actor_user_id'  => auth()->id(),
+                'action'         => 'sms_retry_batch',
+                'entity_type'    => 'SmsLog',
+                'change_details' => [
                     'retried_count' => count($failedLogs),
                     'success_count' => $successCount,
                     'failure_count' => $failureCount,
@@ -247,32 +186,30 @@ class SmsController extends Controller
         });
     }
 
-    /**
-     * Validate webhook signature for SMS provider.
-     */
-    private function validateWebhookSignature(Request $request): bool
+    // -------------------------------------------------------------------------
+    // Private helpers
+    // -------------------------------------------------------------------------
+
+    private function buildReminderMessage(Meeting $meeting, string $template): string
     {
-        $signature = $request->header('X-Webhook-Signature');
-        $expectedSignature = hash_hmac(
-            'sha256',
-            $request->getContent(),
-            config('services.sms.webhook_secret')
+        $next = $meeting->nextOccurrence();
+
+        $date = $next?->format('M j, Y')
+            ?? ($meeting->scheduled_time ? Carbon::parse($meeting->scheduled_time)->format('M j, Y') : '—');
+
+        $time = $next?->format('g:i A')
+            ?? ($meeting->meeting_time ? Carbon::parse($meeting->meeting_time)->format('g:i A') : '—');
+
+        return str_replace(
+            ['{facility_name}', '{meeting_date}', '{meeting_time}', '{facility_address}'],
+            [
+                $meeting->facility->facility_name ?? '—',
+                $date,
+                $time,
+                $meeting->facility->address ?? '—',
+            ],
+            $template
         );
-
-        if ($signature !== $expectedSignature) {
-            abort(401, 'Invalid webhook signature');
-        }
-
-        return true;
-    }
-
-    /**
-     * Update SMS configuration.
-     */
-    private function updateSmsConfig(array $settings): void
-    {
-        // Implementation would write to .env or config file
-        // For now, this is a placeholder for the actual implementation
     }
 
 }

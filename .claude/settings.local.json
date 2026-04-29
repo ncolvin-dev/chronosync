@@ -13,7 +13,9 @@
       "Bash(php -r \"echo session_save_path\\(\\);\")",
       "Bash(find /Users/owena/Documents/Projects/chronosync/storage/framework/sessions -type f ! -name '.gitignore' -delete)",
       "Bash(grep -n '$volunteer\\\\|$user\\\\|auth\\(\\)->user\\(\\)->' /Users/owena/Documents/Projects/chronosync/resources/views/settings.blade.php)",
-      "Bash(git add *)"
+      "Bash(git add *)",
+      "Bash(git -C /home/nc/github/chronosync_files/chronosync status --short)",
+      "Bash(git -C /home/nc/github/chronosync_files/chronosync log --oneline -5)"
     ]
   }
 }

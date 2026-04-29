@@ -42,6 +42,7 @@ class MeetingAssignment extends Model
         'assignment_type',
         'override_reason',
         'confirmed_at',
+        'sns_subscription_arn',
     ];
 
     protected $casts = [

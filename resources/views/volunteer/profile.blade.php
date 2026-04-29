@@ -676,7 +676,7 @@
                     <div style="display: flex; gap: 2rem; padding: 1rem 0; border-bottom: 1px solid #e0e0e0; flex-wrap: wrap;">
                         <div style="min-width: 160px;">
                             <div class="info-label">Type</div>
-                            <div class="info-value">{{ $cred->credentialType?->name ?? '—' }}</div>
+                            <div class="info-value">{{ $cred->credentialType?->display_name ?? '—' }}</div>
                         </div>
                         <div style="min-width: 100px;">
                             <div class="info-label">Status</div>

@@ -520,7 +520,7 @@
                             <tbody>
                                 @foreach($volunteer->credentials as $cred)
                                 <tr>
-                                    <td>{{ $cred->credentialType?->name ?? '—' }}</td>
+                                    <td>{{ $cred->credentialType?->display_name ?? '—' }}</td>
                                     <td>{{ $cred->facility?->facility_name ?? '—' }}</td>
                                     <td>
                                         <span class="status-pill status-{{ $cred->status }}">

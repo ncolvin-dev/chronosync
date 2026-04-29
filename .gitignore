@@ -1,5 +1,6 @@
 *.log
 .DS_Store
+**/.DS_Store
 .env
 .env.backup
 .env.production
@@ -12,13 +13,13 @@
 /.vscode
 /.zed
 /auth.json
-/node_modules
+node_modules/
 /public/build
 /public/hot
 /public/storage
 /storage/*.key
 /storage/pail
-/vendor
+vendor/
 Homestead.json
 Homestead.yaml
 Thumbs.db
@@ -41,3 +42,5 @@ volunteer_declined_assignment,
 volunteer_id,
 yes_via_sms],
 ChronoSync_Deployment_Guide.docx
+ChronoSync_Presentation.pptx
+ChronoSync_Test_Cheatsheet.html

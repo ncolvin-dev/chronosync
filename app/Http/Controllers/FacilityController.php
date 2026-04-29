@@ -218,8 +218,8 @@ class FacilityController extends Controller
                 ]);
             }
 
-            return redirect()->route('facilities.show', $facility)
-                ->with('success', 'Facility updated successfully.');
+            return redirect()->route('facilities.index')
+                ->with('success', "Facility '{$facility->facility_name}' updated successfully.");
         });
     }
 

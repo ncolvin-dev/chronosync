@@ -41,6 +41,7 @@ class Meeting extends Model
 
     protected $fillable = [
         'facility_id',
+        'scheduled_time',
         'day_of_week',
         'week_of_month',
         'meeting_time',
@@ -49,9 +50,11 @@ class Meeting extends Model
         'volunteers_needed',
         'status',
         'notes',
+        'sns_topic_arn',
     ];
 
     protected $casts = [
+        'scheduled_time'    => 'datetime',
         'day_of_week'       => 'integer',
         'week_of_month'     => 'integer',
         'duration_minutes'  => 'integer',
@@ -82,12 +85,27 @@ class Meeting extends Model
         5 => 'Last',
     ];
 
+    public function isOneOff(): bool
+    {
+        return !is_null($this->scheduled_time);
+    }
+
+    public function isRecurring(): bool
+    {
+        return is_null($this->scheduled_time);
+    }
+
     /**
-     * Get a human-readable label for this recurring slot.
-     * E.g., "Every 2nd Tuesday at 7:00 PM"
+     * Human-readable label for display and SMS messages.
+     * One-off:   "Apr 30, 2025 at 7:00 PM"
+     * Recurring: "Every 2nd Tuesday at 7:00 PM"
      */
     public function getScheduleLabelAttribute(): string
     {
+        if ($this->isOneOff()) {
+            return $this->scheduled_time->format('M j, Y \a\t g:i A');
+        }
+
         $week = self::WEEK_LABELS[$this->week_of_month] ?? $this->week_of_month;
         $day  = self::DAY_NAMES[$this->day_of_week] ?? $this->day_of_week;
         $time = $this->meeting_time
@@ -98,12 +116,16 @@ class Meeting extends Model
     }
 
     /**
-     * Compute the calendar date of the next upcoming occurrence.
-     * Returns null if the pattern cannot resolve (e.g., week 5 in a
-     * month that only has 4 of that weekday).
+     * Compute the next upcoming occurrence date.
+     * For one-off meetings, returns scheduled_time if it hasn't passed yet.
+     * For recurring meetings, searches the current and next month.
      */
     public function nextOccurrence(): ?Carbon
     {
+        if ($this->isOneOff()) {
+            return $this->scheduled_time?->isFuture() ? $this->scheduled_time : null;
+        }
+
         return $this->occurrenceInMonth(now()->year, now()->month)
             ?? $this->occurrenceInMonth(now()->addMonth()->year, now()->addMonth()->month);
     }

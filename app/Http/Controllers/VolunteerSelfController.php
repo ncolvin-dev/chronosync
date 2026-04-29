@@ -51,7 +51,7 @@ class VolunteerSelfController extends Controller
 
         // Coordinators and admins land on their own dashboard at the same URL.
         if ($user->hasAnyRole(['coordinator', 'admin'])) {
-            return view('coordinator.dashboard');
+            return redirect()->route('admin.dashboard');
         }
 
         $volunteer           = $this->resolveVolunteer();

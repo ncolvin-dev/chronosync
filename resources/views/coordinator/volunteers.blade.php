@@ -19,6 +19,227 @@
         font-size: 1.5rem;
     }
 
+    .btn-add {
+        background-color: #0099cc;
+        color: white;
+        border: none;
+        padding: 0.75rem 1.5rem;
+        border-radius: 0.5rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: background-color 0.2s;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+    }
+
+    .btn-add:hover { background-color: #003366; }
+
+    /* ── Volunteer Modal ── */
+    .vol-modal-overlay {
+        display: none;
+        position: fixed;
+        inset: 0;
+        background: rgba(0,0,0,0.5);
+        z-index: 1080;
+        overflow-y: auto;
+        padding: 5rem 1rem 2rem;
+    }
+
+    .vol-modal-overlay.show { display: block; }
+
+    .vol-modal-dialog {
+        background: white;
+        border-radius: 0.75rem;
+        box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+        width: 100%;
+        max-width: 620px;
+        margin: 0 auto;
+    }
+
+    .vol-modal-header {
+        padding: 1.25rem 1.5rem;
+        background: linear-gradient(135deg, #003366 0%, #0099cc 100%);
+        color: white;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        border-radius: 0.75rem 0.75rem 0 0;
+    }
+
+    .vol-modal-title { font-size: 1.1rem; font-weight: 700; }
+
+    .vol-modal-close {
+        background: none;
+        border: none;
+        color: white;
+        font-size: 1.5rem;
+        cursor: pointer;
+        line-height: 1;
+        padding: 0;
+    }
+
+    .vol-modal-body { padding: 1.5rem; }
+
+    .vol-modal-footer {
+        padding: 1rem 1.5rem;
+        border-top: 1px solid #e0e0e0;
+        display: flex;
+        justify-content: flex-end;
+        gap: 0.75rem;
+    }
+
+    .vol-section-heading {
+        font-size: 0.78rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.8px;
+        color: #0099cc;
+        border-bottom: 1px solid #e8f4fb;
+        padding-bottom: 0.4rem;
+        margin: 1.25rem 0 1rem;
+    }
+
+    .vol-section-heading:first-child { margin-top: 0; }
+
+    .vol-form-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 1rem;
+    }
+
+    .vol-form-group { margin-bottom: 1.1rem; }
+
+    .vol-form-label {
+        font-weight: 600;
+        color: #333;
+        font-size: 0.875rem;
+        display: block;
+        margin-bottom: 0.35rem;
+    }
+
+    .vol-form-control,
+    .vol-form-select {
+        width: 100%;
+        padding: 0.5rem 0.75rem;
+        border: 1px solid #ddd;
+        border-radius: 0.5rem;
+        font-size: 0.875rem;
+        height: 2.6rem;
+        transition: border-color 0.2s;
+    }
+
+    .vol-form-control:focus,
+    .vol-form-select:focus {
+        border-color: #0099cc;
+        box-shadow: 0 0 0 0.2rem rgba(0,153,204,0.2);
+        outline: none;
+    }
+
+    .vol-form-text {
+        font-size: 0.72rem;
+        color: #999;
+        margin-top: 0.2rem;
+    }
+
+    .vol-error-msg {
+        font-size: 0.75rem;
+        color: #dc3545;
+        margin-top: 0.2rem;
+        display: none;
+    }
+
+    .vol-form-check {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        margin-bottom: 0.4rem;
+        font-size: 0.875rem;
+        color: #444;
+    }
+
+    .vol-form-check input { accent-color: #0099cc; }
+
+    .vol-conditional { display: none; }
+    .vol-conditional.show { display: block; }
+
+    .vol-pw-strength {
+        height: 5px;
+        background: #e0e0e0;
+        border-radius: 3px;
+        margin-top: 0.4rem;
+        overflow: hidden;
+    }
+
+    .vol-pw-bar {
+        height: 100%;
+        width: 0;
+        border-radius: 3px;
+        transition: all 0.3s;
+    }
+
+    .vol-pw-bar.weak   { width: 33%; background: #dc3545; }
+    .vol-pw-bar.fair   { width: 66%; background: #ffc107; }
+    .vol-pw-bar.strong { width: 100%; background: #28a745; }
+
+    .vol-pw-text { font-size: 0.72rem; font-weight: 600; margin-top: 0.2rem; }
+    .vol-pw-text.weak   { color: #dc3545; }
+    .vol-pw-text.fair   { color: #ffc107; }
+    .vol-pw-text.strong { color: #28a745; }
+
+    .btn-vol-primary {
+        background: #0099cc;
+        color: white;
+        border: none;
+        padding: 0.6rem 1.25rem;
+        border-radius: 0.5rem;
+        font-weight: 600;
+        cursor: pointer;
+    }
+
+    .btn-vol-primary:hover { background: #003366; }
+
+    .btn-vol-secondary {
+        background: #e0e0e0;
+        color: #333;
+        border: none;
+        padding: 0.6rem 1.25rem;
+        border-radius: 0.5rem;
+        font-weight: 600;
+        cursor: pointer;
+    }
+
+    .btn-vol-secondary:hover { background: #ccc; }
+
+    /* Dark mode */
+    html.dark .vol-modal-dialog { background: #1a2235; }
+    html.dark .vol-modal-footer { border-top-color: #2a3a50; }
+    html.dark .vol-section-heading { color: #38bdf8; border-bottom-color: #1e3a4a; }
+    html.dark .vol-form-label { color: #cbd5e1; }
+    html.dark .vol-form-text  { color: #64748b; }
+    html.dark .vol-form-control,
+    html.dark .vol-form-select {
+        background: #141d2e;
+        border-color: #2a3a50;
+        color: #e2e8f0;
+    }
+    html.dark .vol-form-control::placeholder { color: #4a5a6a; }
+    html.dark .vol-form-control:focus,
+    html.dark .vol-form-select:focus {
+        background: #141d2e;
+        border-color: #0099cc;
+        color: #e2e8f0;
+    }
+    html.dark .vol-form-select option { background: #1a2235; color: #e2e8f0; }
+    html.dark .vol-form-check { color: #94a3b8; }
+    html.dark .vol-pw-strength { background: #2a3a50; }
+    html.dark .btn-vol-secondary { background: #2a3a50; color: #cbd5e1; }
+    html.dark .btn-vol-secondary:hover { background: #374f6b; }
+
+    @media (max-width: 576px) {
+        .vol-form-row { grid-template-columns: 1fr; gap: 0; }
+    }
+
     .search-and-filter {
         background: white;
         border-radius: 0.75rem;
@@ -494,6 +715,9 @@
                 <h1 class="volunteers-title">
                     <i class="fas fa-users"></i> Volunteer Management
                 </h1>
+                <button class="btn-add" onclick="openAddVolunteerModal()">
+                    <i class="fas fa-plus"></i> Add Volunteer
+                </button>
             </div>
 
             <!-- Search and Filters -->
@@ -552,9 +776,10 @@
                 @forelse($volunteers as $volunteer)
                 @php
                     $initials   = strtoupper(substr($volunteer->first_name, 0, 1) . substr($volunteer->last_name, 0, 1));
-                    $cleanYears  = (int) $volunteer->clean_date->diffInYears(now());
+                    $cleanYears = (int) $volunteer->clean_date->diffInYears(now());
                     $cleanMonths = (int) $volunteer->clean_date->copy()->addYears($cleanYears)->diffInMonths(now());
-                    $cleanLabel  = $cleanYears . ' yrs ' . $cleanMonths . ' mo';
+                    $cleanLabel = $cleanYears . ' yr' . ($cleanYears != 1 ? 's' : '')
+                                . ' ' . $cleanMonths . ' mo';
                     $onProbation = $volunteer->probation_status === 'active_probation';
                 @endphp
                 <div class="volunteer-row">
@@ -584,7 +809,7 @@
                         <div class="credentials-list">
                             @forelse($volunteer->credentials as $cred)
                                 @php
-                                    $typeName = $cred->credentialType?->name ?? 'Unknown';
+                                    $typeName = $cred->credentialType?->display_name ?? 'Unknown';
                                     $badgeClass = match($cred->status) {
                                         'pending' => 'pending',
                                         'denied'  => 'expired',
@@ -631,4 +856,268 @@
         </div>
     </div>
 </div>
+
+<!-- Add Volunteer Modal -->
+<div class="vol-modal-overlay" id="volunteerModal">
+    <div class="vol-modal-dialog">
+        <div class="vol-modal-header">
+            <span class="vol-modal-title"><i class="fas fa-user-plus"></i> Add New Volunteer</span>
+            <button class="vol-modal-close" onclick="closeVolunteerModal()">×</button>
+        </div>
+
+        <form method="POST" action="{{ route('coordinator.volunteers.store') }}" id="volunteerForm" novalidate>
+            @csrf
+            <div class="vol-modal-body">
+
+                <div class="vol-section-heading">Personal Information</div>
+
+                <div class="vol-form-row">
+                    <div class="vol-form-group">
+                        <label class="vol-form-label">First Name <span style="color:#dc3545">*</span></label>
+                        <input type="text" class="vol-form-control" name="first_name" id="v_first_name" required>
+                        <div class="vol-error-msg" id="err-v_first_name"></div>
+                    </div>
+                    <div class="vol-form-group">
+                        <label class="vol-form-label">Last Name <span style="color:#dc3545">*</span></label>
+                        <input type="text" class="vol-form-control" name="last_name" id="v_last_name" required>
+                        <div class="vol-error-msg" id="err-v_last_name"></div>
+                    </div>
+                </div>
+
+                <div class="vol-form-group">
+                    <label class="vol-form-label">Email Address <span style="color:#dc3545">*</span></label>
+                    <input type="email" class="vol-form-control" name="email" id="v_email" autocomplete="off" required>
+                    <div class="vol-error-msg" id="err-v_email"></div>
+                </div>
+
+                <div class="vol-form-row">
+                    <div class="vol-form-group">
+                        <label class="vol-form-label">Phone <span style="color:#dc3545">*</span></label>
+                        <input type="tel" class="vol-form-control" name="phone" id="v_phone"
+                               placeholder="(123) 456-7890" required>
+                        <div class="vol-error-msg" id="err-v_phone"></div>
+                    </div>
+                    <div class="vol-form-group">
+                        <label class="vol-form-label">Date of Birth <span style="color:#dc3545">*</span></label>
+                        <input type="date" class="vol-form-control" name="dob" id="v_dob" required>
+                        <div class="vol-error-msg" id="err-v_dob"></div>
+                    </div>
+                </div>
+
+                <div class="vol-form-group">
+                    <label class="vol-form-label">Gender <span style="color:#dc3545">*</span></label>
+                    <select class="vol-form-select" name="gender" id="v_gender" required>
+                        <option value="">Select gender</option>
+                        <option value="male">Male</option>
+                        <option value="female">Female</option>
+                        <option value="non-binary">Non-Binary</option>
+                        <option value="prefer_not_to_say">Prefer Not to Say</option>
+                        <option value="other">Other</option>
+                    </select>
+                    <div class="vol-error-msg" id="err-v_gender"></div>
+                </div>
+
+                <div class="vol-section-heading">Recovery Information</div>
+
+                <div class="vol-form-group">
+                    <label class="vol-form-label">Probation Status <span style="color:#dc3545">*</span></label>
+                    <div class="vol-form-check">
+                        <input type="radio" name="on_probation" id="v_prob_no" value="0" checked>
+                        <label for="v_prob_no">Not on probation</label>
+                    </div>
+                    <div class="vol-form-check">
+                        <input type="radio" name="on_probation" id="v_prob_yes" value="1">
+                        <label for="v_prob_yes">Currently on probation</label>
+                    </div>
+                    <div class="vol-error-msg" id="err-v_on_probation"></div>
+                </div>
+
+                <div class="vol-form-row">
+                    <div class="vol-form-group">
+                        <label class="vol-form-label">Clean Date</label>
+                        <input type="date" class="vol-form-control" name="clean_date" id="v_clean_date">
+                        <div class="vol-form-text">Optional — date became sober.</div>
+                    </div>
+                    <div class="vol-form-group">
+                        <label class="vol-form-label">Neighborhood</label>
+                        <input type="text" class="vol-form-control" name="neighborhood" id="v_neighborhood"
+                               placeholder="e.g. Downtown">
+                    </div>
+                </div>
+
+                <div class="vol-form-group">
+                    <div class="vol-form-check">
+                        <input type="checkbox" name="has_treatment_facility" id="v_has_treatment" value="1"
+                               onchange="toggleTreatment(this.checked)">
+                        <label for="v_has_treatment">Has treatment facility experience</label>
+                    </div>
+                </div>
+
+                <div class="vol-conditional" id="v_treatment_fields">
+                    <div class="vol-form-row">
+                        <div class="vol-form-group">
+                            <label class="vol-form-label">Facility Name</label>
+                            <input type="text" class="vol-form-control" name="treatment_facility_name"
+                                   id="v_treatment_name">
+                        </div>
+                        <div class="vol-form-group">
+                            <label class="vol-form-label">Discharge Date</label>
+                            <input type="date" class="vol-form-control" name="discharge_date" id="v_discharge_date">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="vol-form-group">
+                    <label class="vol-form-label">Primary Bus Line</label>
+                    <input type="text" class="vol-form-control" name="bus_line" id="v_bus_line"
+                           placeholder="e.g. Line 5">
+                </div>
+
+                <div class="vol-section-heading">Account Password</div>
+
+                <div class="vol-form-row">
+                    <div class="vol-form-group">
+                        <label class="vol-form-label">Password <span style="color:#dc3545">*</span></label>
+                        <input type="password" class="vol-form-control" name="password" id="v_password"
+                               autocomplete="new-password" required>
+                        <div class="vol-pw-strength"><div class="vol-pw-bar" id="v_pw_bar"></div></div>
+                        <div class="vol-pw-text" id="v_pw_text"></div>
+                        <div class="vol-form-text">Min 8 chars, uppercase, lowercase, number.</div>
+                        <div class="vol-error-msg" id="err-v_password"></div>
+                    </div>
+                    <div class="vol-form-group">
+                        <label class="vol-form-label">Confirm Password <span style="color:#dc3545">*</span></label>
+                        <input type="password" class="vol-form-control" name="password_confirmation"
+                               id="v_password_confirmation" autocomplete="new-password" required>
+                        <div class="vol-error-msg" id="err-v_password_confirmation"></div>
+                    </div>
+                </div>
+
+            </div>
+
+            <div class="vol-modal-footer">
+                <button type="button" class="btn-vol-secondary" onclick="closeVolunteerModal()">Cancel</button>
+                <button type="submit" class="btn-vol-primary">
+                    <i class="fas fa-user-plus"></i> Add Volunteer
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+@endsection
+
+@section('extra-scripts')
+<script>
+    function openAddVolunteerModal() {
+        document.getElementById('volunteerForm').reset();
+        document.getElementById('v_treatment_fields').classList.remove('show');
+        clearVolErrors();
+        document.getElementById('v_pw_bar').className = 'vol-pw-bar';
+        document.getElementById('v_pw_text').textContent = '';
+        document.getElementById('volunteerModal').classList.add('show');
+    }
+
+    function closeVolunteerModal() {
+        document.getElementById('volunteerModal').classList.remove('show');
+        clearVolErrors();
+    }
+
+    function toggleTreatment(show) {
+        document.getElementById('v_treatment_fields').classList.toggle('show', show);
+    }
+
+    // Close on backdrop click
+    document.getElementById('volunteerModal').addEventListener('click', function(e) {
+        if (e.target === this) closeVolunteerModal();
+    });
+
+    // Phone auto-format
+    document.getElementById('v_phone').addEventListener('input', function(e) {
+        let v = e.target.value.replace(/\D/g, '').slice(0, 10);
+        if (v.length > 6)      v = '(' + v.slice(0,3) + ') ' + v.slice(3,6) + '-' + v.slice(6);
+        else if (v.length > 3) v = '(' + v.slice(0,3) + ') ' + v.slice(3);
+        else if (v.length > 0) v = '(' + v;
+        e.target.value = v;
+    });
+
+    // Password strength
+    document.getElementById('v_password').addEventListener('input', function() {
+        const pw = this.value;
+        let score = 0;
+        if (pw.length >= 8)  score++;
+        if (pw.length >= 12) score++;
+        if (/[a-z]/.test(pw)) score++;
+        if (/[A-Z]/.test(pw)) score++;
+        if (/[0-9]/.test(pw)) score++;
+        if (/[^a-zA-Z0-9]/.test(pw)) score++;
+        const s   = Math.min(Math.ceil(score / 2), 3);
+        const cls = ['', 'weak', 'fair', 'strong'][s];
+        const lbl = ['', 'Weak', 'Fair', 'Strong'][s];
+        const bar = document.getElementById('v_pw_bar');
+        const txt = document.getElementById('v_pw_text');
+        bar.className = 'vol-pw-bar' + (pw ? ' ' + cls : '');
+        txt.className = 'vol-pw-text' + (pw ? ' ' + cls : '');
+        txt.textContent = pw ? lbl + ' password' : '';
+    });
+
+    // ── Validation ──────────────────────────────────────────────────────────
+    const VOL_REQUIRED = [
+        { id: 'v_first_name', label: 'First Name' },
+        { id: 'v_last_name',  label: 'Last Name' },
+        { id: 'v_email',      label: 'Email Address' },
+        { id: 'v_phone',      label: 'Phone' },
+        { id: 'v_dob',        label: 'Date of Birth' },
+        { id: 'v_gender',     label: 'Gender' },
+        { id: 'v_password',   label: 'Password' },
+        { id: 'v_password_confirmation', label: 'Confirm Password' },
+    ];
+
+    function setVolError(id, msg) {
+        const el  = document.getElementById(id);
+        const err = document.getElementById('err-' + id);
+        if (el)  el.style.borderColor = '#dc3545';
+        if (err) { err.textContent = msg; err.style.display = 'block'; }
+    }
+
+    function clearVolError(id) {
+        const el  = document.getElementById(id);
+        const err = document.getElementById('err-' + id);
+        if (el)  el.style.borderColor = '';
+        if (err) { err.textContent = ''; err.style.display = 'none'; }
+    }
+
+    function clearVolErrors() {
+        VOL_REQUIRED.forEach(f => clearVolError(f.id));
+    }
+
+    VOL_REQUIRED.forEach(({ id }) => {
+        const el = document.getElementById(id);
+        if (el) el.addEventListener('input', () => clearVolError(id));
+    });
+
+    document.getElementById('volunteerForm').addEventListener('submit', function(e) {
+        clearVolErrors();
+        let first = null;
+
+        VOL_REQUIRED.forEach(({ id, label }) => {
+            const el = document.getElementById(id);
+            if (!el || el.value.trim() !== '') return;
+            setVolError(id, label + ' is required.');
+            if (!first) first = el;
+        });
+
+        const pw  = document.getElementById('v_password').value;
+        const pwc = document.getElementById('v_password_confirmation').value;
+        if (pw && pwc && pw !== pwc) {
+            setVolError('v_password_confirmation', 'Passwords do not match.');
+            if (!first) first = document.getElementById('v_password_confirmation');
+        }
+
+        if (first) {
+            e.preventDefault();
+            first.focus();
+            first.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+    });
+</script>
 @endsection
