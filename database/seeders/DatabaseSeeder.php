@@ -18,6 +18,7 @@ class DatabaseSeeder extends Seeder
             CredentialSeeder::class,
             MeetingSeeder::class,
             AvailabilitySeeder::class,
+            AssignmentSeeder::class,
         ]);
     }
 }

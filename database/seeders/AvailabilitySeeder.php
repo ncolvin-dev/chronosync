@@ -58,9 +58,9 @@ class AvailabilitySeeder extends Seeder
                         Availability::create([
                             'volunteer_id'  => $volunteer->volunteer_id,
                             'week_of_month' => $week,
-                            'day_of_week'   => $dayOfWeek,
-                            'hour_start'    => $hourStart,
-                            'hour_end'      => $hourStart + 1,
+                            'day_of_week'   => $day,
+                            'hour_start'    => $hour,
+                            'hour_end'      => $hour + 1,
                             'is_available'  => true,
                         ]);
                     }
