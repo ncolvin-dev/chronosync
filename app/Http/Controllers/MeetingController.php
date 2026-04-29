@@ -102,9 +102,13 @@ class MeetingController extends Controller
         }
 
         $meetings = $query
-            ->orderBy('day_of_week')
-            ->orderBy('week_of_month')
-            ->orderBy('meeting_time')
+            ->join('facilities', 'meetings.facility_id', '=', 'facilities.facility_id')
+            ->orderBy('facilities.facility_name')
+            ->orderBy('meetings.day_of_week')
+            ->orderBy('meetings.week_of_month')
+            ->orderBy('meetings.meeting_time')
+            ->orderBy('meetings.scheduled_time')
+            ->select('meetings.*')
             ->paginate(15);
 
         $facilities = Facility::where('status', 'active')
@@ -174,7 +178,13 @@ class MeetingController extends Controller
             ]);
 
             // Create the SNS topic for this meeting slot so it is ready for subscriptions.
-            $this->snsService->ensureTopicExists($meeting);
+            try {
+                $this->snsService->ensureTopicExists($meeting);
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('SNS ensureTopicExists failed on meeting create', [
+                    'meeting_id' => $meeting->meeting_id, 'error' => $e->getMessage(),
+                ]);
+            }
 
             return redirect()->route('meetings.index')
                 ->with('success', 'Meeting created successfully.');
@@ -282,7 +292,13 @@ class MeetingController extends Controller
                     SendSmsJob::dispatch($a, 'confirmation_request');
                 }
 
-                $this->snsService->syncSubscriptions($sibling);
+                try {
+                    $this->snsService->syncSubscriptions($sibling);
+                } catch (\Throwable $e) {
+                    \Illuminate\Support\Facades\Log::warning('SNS syncSubscriptions failed on bulk assign', [
+                        'meeting_id' => $sibling->meeting_id, 'error' => $e->getMessage(),
+                    ]);
+                }
                 $assigned++;
             }
 
@@ -295,17 +311,23 @@ class MeetingController extends Controller
         }
 
         // Single assignment — fall back to the meeting's next computed occurrence when no date supplied.
+        // For one-off meetings whose scheduled_time is in the past, use scheduled_time directly so
+        // coordinators can still assign volunteers to already-occurred meetings (e.g. record keeping).
         $dateStr = $validated['assignment_date']
-            ?? $meeting->nextOccurrence()?->toDateString();
+            ?? $meeting->nextOccurrence()?->toDateString()
+            ?? $meeting->scheduled_time?->toDateString();
 
         if (!$dateStr) {
             return back()->with('error', 'Could not determine the next occurrence date for this meeting.');
         }
 
         // Guard: check the volunteer cap before touching the database.
-        $current = $meeting->activeAssignmentsForDate($dateStr)->count();
-        if ($current >= $meeting->volunteers_needed) {
-            return back()->with('error', "This occurrence already has {$meeting->volunteers_needed} volunteer(s) assigned.");
+        $activeAssignments = $meeting->activeAssignmentsForDate($dateStr)->with('volunteer')->get();
+        if ($activeAssignments->count() >= $meeting->volunteers_needed) {
+            $names = $activeAssignments
+                ->map(fn($a) => trim(($a->volunteer->first_name ?? '') . ' ' . ($a->volunteer->last_name ?? '')) ?: 'Unknown')
+                ->join(', ');
+            return back()->with('error', "This occurrence is already filled. Assigned: {$names}.");
         }
 
         // Guard: prevent assigning the same volunteer to the same date twice.
@@ -466,7 +488,13 @@ class MeetingController extends Controller
 
         // Remove the cancelled volunteer from the SNS topic.
         if ($meetingAssignment->meeting) {
-            $this->snsService->syncSubscriptions($meetingAssignment->meeting);
+            try {
+                $this->snsService->syncSubscriptions($meetingAssignment->meeting);
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('SNS syncSubscriptions failed on cancel', [
+                    'assignment_id' => $meetingAssignment->meeting_assignment_id, 'error' => $e->getMessage(),
+                ]);
+            }
         }
 
         if ($request->expectsJson()) {

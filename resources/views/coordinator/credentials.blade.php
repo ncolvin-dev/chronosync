@@ -407,6 +407,13 @@
         background-color: #1a2235 !important;
     }
 
+    /* Volunteer group header row */
+    html.dark .table > tbody > tr.volunteer-group-header > td {
+        background-color: #141d2e !important;
+        color: #93c5fd !important;
+        border-bottom-color: #2a3a50 !important;
+    }
+
     html.dark .table > tbody > tr > td {
         background-color: #1a2235 !important;
         color: #e2e8f0 !important;
@@ -704,12 +711,11 @@
             </div>
             </form>
 
-            {{-- Credentials Table --}}
+            {{-- Credentials Table — grouped by volunteer --}}
             <div class="credentials-table">
                 <table class="table">
                     <thead>
                         <tr>
-                            <th>Volunteer</th>
                             <th>Facility</th>
                             <th>Credential Type</th>
                             <th>Approval Date</th>
@@ -719,7 +725,33 @@
                         </tr>
                     </thead>
                     <tbody>
-                        @forelse($credentials as $cred)
+                        @php $grouped = $credentials->getCollection()->groupBy('volunteer_id'); @endphp
+                        @if($grouped->isEmpty())
+                        <tr>
+                            <td colspan="6" style="text-align:center;padding:3rem;color:#999;">
+                                <i class="fas fa-certificate" style="font-size:2rem;display:block;margin-bottom:0.75rem;color:#ddd;"></i>
+                                No credentials match your filters.
+                            </td>
+                        </tr>
+                        @else
+                        @foreach($grouped as $volunteerId => $volCreds)
+                        {{-- Volunteer group header --}}
+                        <tr class="volunteer-group-header">
+                            <td colspan="6" style="background:#f0f4f8;padding:0.6rem 1rem;border-bottom:2px solid #d0dce8;">
+                                <strong style="color:#003366;font-size:0.95rem;">
+                                    <i class="fas fa-user" style="margin-right:0.4rem;color:#0099cc;"></i>
+                                    {{ $volCreds->first()->volunteer->first_name }} {{ $volCreds->first()->volunteer->last_name }}
+                                </strong>
+                                @if($volCreds->first()->volunteer->phone)
+                                    <span style="color:#666;font-size:0.82rem;margin-left:0.75rem;">
+                                        <i class="fas fa-phone" style="font-size:0.75rem;"></i>
+                                        {{ $volCreds->first()->volunteer->phone }}
+                                    </span>
+                                @endif
+                            </td>
+                        </tr>
+                        {{-- That volunteer's credentials --}}
+                        @foreach($volCreds as $cred)
                         @php
                             $isExpiringSoon = $cred->status === 'approved'
                                 && $cred->expiration_date
@@ -729,10 +761,6 @@
                                 && \Carbon\Carbon::parse($cred->expiration_date)->isPast();
                         @endphp
                         <tr class="{{ $isExpiringSoon ? 'expiration-soon' : '' }}">
-                            <td>
-                                <strong>{{ $cred->volunteer->first_name }} {{ $cred->volunteer->last_name }}</strong><br>
-                                <small style="color:#999;">{{ $cred->volunteer->phone }}</small>
-                            </td>
                             <td>{{ $cred->facility?->facility_name ?? '—' }}</td>
                             <td>{{ $cred->credentialType?->display_name ?? '—' }}</td>
                             <td>{{ $cred->approval_date ? \Carbon\Carbon::parse($cred->approval_date)->format('M d, Y') : '—' }}</td>
@@ -766,17 +794,14 @@
                             <td>
                                 <div class="action-buttons">
                                     @if($cred->status === 'pending')
-                                        {{-- Approve --}}
                                         <form method="POST" action="{{ route('credentials.approve', $cred->credential_id) }}" style="display:inline;">
                                             @csrf @method('PATCH')
                                             <button type="submit" class="btn-small btn-approve">Approve</button>
                                         </form>
-                                        {{-- Deny (opens inline form) --}}
                                         <button type="button" class="btn-small btn-deny"
                                                 onclick="toggleDenyForm('{{ $cred->credential_id }}')">Deny</button>
                                     @endif
                                     @if($cred->status === 'approved' || $isExpired)
-                                        {{-- Renew (opens inline form) --}}
                                         <button type="button" class="btn-small btn-renew"
                                                 onclick="toggleRenewForm('{{ $cred->credential_id }}')">Renew</button>
                                     @endif
@@ -863,14 +888,9 @@
                                 </div>
                             </td>
                         </tr>
-                        @empty
-                        <tr>
-                            <td colspan="7" style="text-align:center;padding:3rem;color:#999;">
-                                <i class="fas fa-certificate" style="font-size:2rem;display:block;margin-bottom:0.75rem;color:#ddd;"></i>
-                                No credentials match your filters.
-                            </td>
-                        </tr>
-                        @endforelse
+                        @endforeach
+                        @endforeach
+                        @endif
                     </tbody>
                 </table>
             </div>

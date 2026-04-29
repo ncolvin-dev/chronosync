@@ -587,10 +587,17 @@
                         }
                     }
 
-                    // Load all upcoming active assignments for this meeting
+                    // Load active assignments for this meeting's relevant occurrence date.
+                    // For one-off meetings whose scheduled_time is in the past we still
+                    // want to show who is assigned, so we query by the specific date rather
+                    // than filtering to only future dates.
+                    $relevantDate = $nextDate
+                        ? $nextDate->toDateString()
+                        : ($meeting->scheduled_time ? \Carbon\Carbon::parse($meeting->scheduled_time)->toDateString() : now()->toDateString());
+
                     $upcomingAssignments = $meeting->assignments()
                         ->whereIn('status', ['scheduled', 'confirmed', 'pending_confirmation'])
-                        ->where('assignment_date', '>=', now()->toDateString())
+                        ->where('assignment_date', $relevantDate)
                         ->with('volunteer')
                         ->orderBy('assignment_date')
                         ->get();

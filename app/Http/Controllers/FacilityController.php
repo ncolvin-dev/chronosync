@@ -88,6 +88,13 @@ class FacilityController extends Controller
             'meetings.*.duration_minutes'      => 'nullable|integer|min:15|max:480',
             'meetings.*.format'                => 'required_with:meetings|in:in_person,virtual,hybrid',
             'meetings.*.volunteers_needed'     => 'required_with:meetings|integer|between:1,5',
+        ], [
+            'meetings.*.meeting_time.required_with' => 'The meeting time field is required for each meeting slot.',
+            'meetings.*.meeting_time.date_format'   => 'The meeting time must be a valid time (HH:MM).',
+            'meetings.*.day_of_week.required_with'  => 'The day of week is required for each meeting slot.',
+            'meetings.*.week_of_month.required_with'=> 'The week of month is required for each meeting slot.',
+            'meetings.*.format.required_with'       => 'The meeting format is required for each meeting slot.',
+            'meetings.*.volunteers_needed.required_with' => 'The volunteers needed field is required for each meeting slot.',
         ]);
 
         return DB::transaction(function () use ($validated, $request) {

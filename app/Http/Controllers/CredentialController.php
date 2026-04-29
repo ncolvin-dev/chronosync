@@ -153,11 +153,19 @@ class CredentialController extends Controller
         $validated = $request->validate([
             'volunteer_id'       => 'required|exists:volunteers,volunteer_id',
             'facility_id'        => 'required|exists:facilities,facility_id',
-            'credential_type_id' => 'required|exists:credential_types,credential_type_id',
+            'credential_type_id' => [
+                'required',
+                'exists:credential_types,credential_type_id',
+                \Illuminate\Validation\Rule::unique('volunteer_credentials')
+                    ->where('volunteer_id',  $request->input('volunteer_id'))
+                    ->where('facility_id',   $request->input('facility_id')),
+            ],
             'status'             => 'required|in:pending,approved,denied',
             'approval_date'      => 'nullable|date',
             'expiration_date'    => 'nullable|date',
             'notes'              => 'nullable|string|max:500',
+        ], [
+            'credential_type_id.unique' => 'This volunteer already has that credential type on file for the selected facility.',
         ]);
 
         $credential = VolunteerCredential::create($validated);

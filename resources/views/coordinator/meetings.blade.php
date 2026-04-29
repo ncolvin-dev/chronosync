@@ -301,6 +301,21 @@
 
     html.dark .section-title,
     html.dark .modal-title,
+    html.dark .meetings-table tr.facility-group-header td {
+        background: #0f172a !important;
+        color: #93c5fd !important;
+        border-bottom-color: #334155 !important;
+    }
+
+    html.dark .meetings-table tr.meeting-type-header td {
+        background: #0d1424 !important;
+        border-bottom-color: #1e293b !important;
+    }
+
+    html.dark .meetings-table tr.meeting-type-header td span {
+        color: #64748b !important;
+    }
+
     html.dark .meetings-table th,
     html.dark .form-label { color: #93c5fd; }
 
@@ -396,31 +411,62 @@
                 <table class="meetings-table">
                     <thead>
                         <tr>
-                            <th>Facility</th>
                             <th>Schedule</th>
-                            <th>Type</th>
                             <th>Format</th>
                             <th style="text-align:center;">Volunteers</th>
                             <th>Status</th>
-                            <th>Actions</th>
+                            <th colspan="2">Actions</th>
                         </tr>
                     </thead>
                     <tbody>
-                        @foreach($meetings as $meeting)
-                        <tr>
-                            <td style="font-weight:600;">
-                                {{ $meeting->facility->facility_name ?? '—' }}
+                        @php $grouped = $meetings->getCollection()->groupBy('facility_id'); @endphp
+                        @foreach($grouped as $facilityId => $facilityMeetings)
+                        {{-- Facility group header --}}
+                        <tr class="facility-group-header">
+                            <td colspan="6" style="background:#f0f4f8;padding:0.6rem 1rem;border-bottom:2px solid #d0dce8;">
+                                <strong style="color:#003366;font-size:0.95rem;">
+                                    <i class="fas fa-building" style="margin-right:0.4rem;color:#0099cc;"></i>
+                                    {{ $facilityMeetings->first()->facility->facility_name ?? '—' }}
+                                </strong>
+                                <span style="color:#666;font-size:0.82rem;margin-left:0.75rem;">
+                                    {{ $facilityMeetings->count() }} meeting{{ $facilityMeetings->count() !== 1 ? 's' : '' }}
+                                </span>
                             </td>
+                        </tr>
+                        {{-- Split into recurring and one-off sub-groups --}}
+                        @php
+                            $recurring = $facilityMeetings
+                                ->filter(fn($m) => $m->isRecurring())
+                                ->sortBy([['day_of_week','asc'],['week_of_month','asc'],['meeting_time','asc']]);
+                            $oneOff = $facilityMeetings
+                                ->filter(fn($m) => $m->isOneOff())
+                                ->sortBy(fn($m) => optional($m->scheduled_time)->timestamp ?? 0);
+                        @endphp
+
+                        @foreach([['Recurring', 'fas fa-sync-alt', $recurring], ['One-off', 'fas fa-calendar-day', $oneOff]] as [$label, $icon, $group])
+                        @if($group->isNotEmpty())
+                        {{-- Type sub-header --}}
+                        <tr class="meeting-type-header">
+                            <td colspan="6" style="padding:0.35rem 1.5rem;background:#fafbfc;border-bottom:1px solid #e4eaf0;">
+                                <span style="font-size:0.78rem;font-weight:700;color:#5a7a99;text-transform:uppercase;letter-spacing:0.05em;">
+                                    <i class="{{ $icon }}" style="margin-right:0.35rem;"></i>{{ $label }}
+                                    <span style="font-weight:500;text-transform:none;letter-spacing:0;margin-left:0.4rem;color:#8aa;">
+                                        ({{ $group->count() }})
+                                    </span>
+                                </span>
+                            </td>
+                        </tr>
+                        @foreach($group as $meeting)
+                        <tr>
                             <td>{{ $meeting->schedule_label }}</td>
-                            <td>{{ $meeting->isRecurring() ? 'Recurring' : 'One-off' }}</td>
                             <td>{{ ucfirst(str_replace('_', ' ', $meeting->format)) }}</td>
                             <td style="text-align:center;">{{ $meeting->volunteers_needed }}</td>
-                            <td>
+                            <td colspan="1">
                                 <span class="status-badge {{ $meeting->status === 'active' ? 'status-active' : 'status-inactive' }}">
                                     {{ ucfirst($meeting->status) }}
                                 </span>
                             </td>
-                            <td>
+                            <td colspan="2">
                                 <div class="action-btns">
                                     <button class="btn-sm btn-edit"
                                             data-meeting='@json($meeting)'
@@ -456,6 +502,10 @@
                                 </div>
                             </td>
                         </tr>
+                        @endforeach
+                        @endif
+                        @endforeach
+
                         @endforeach
                     </tbody>
                 </table>

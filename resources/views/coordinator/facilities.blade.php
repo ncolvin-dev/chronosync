@@ -700,6 +700,18 @@
             <input type="hidden" name="_method" id="formMethod" value="POST">
 
             <div class="modal-body">
+                {{-- Server-side validation errors --}}
+                @if($errors->any())
+                <div id="modal-error-banner" style="background:#f8d7da;color:#721c24;border-radius:0.5rem;padding:0.75rem 1rem;margin-bottom:1.25rem;font-size:0.875rem;">
+                    <strong><i class="fas fa-exclamation-circle"></i> Please fix the following errors:</strong>
+                    <ul style="margin:0.4rem 0 0 1.25rem;padding:0;">
+                        @foreach($errors->all() as $error)
+                            <li>{{ $error }}</li>
+                        @endforeach
+                    </ul>
+                </div>
+                @endif
+
                 <!-- Basic Information -->
                 <h4 style="margin-bottom: 1rem; color: #003366; font-weight: 600;">Basic Information</h4>
 
@@ -744,8 +756,8 @@
                 </div>
 
                 <div class="form-group">
-                    <label for="contact_email" class="form-label">Contact Email *</label>
-                    <input type="email" class="form-control" id="contact_email" name="contact_email" required>
+                    <label for="contact_email" class="form-label">Contact Email</label>
+                    <input type="email" class="form-control" id="contact_email" name="contact_email">
                 </div>
 
                 <!-- Primary Contact -->
@@ -819,7 +831,7 @@
                 <div class="form-row">
                     <div class="form-group">
                         <label class="form-label">
-                            <input type="checkbox" id="gender_restriction" name="gender_restriction">
+                            <input type="checkbox" id="gender_restriction" name="gender_restriction" value="1">
                             Gender Restriction
                         </label>
                     </div>
@@ -833,7 +845,7 @@
                 </div>
 
                 <div class="checkbox-item">
-                    <input type="checkbox" id="probation_allowed" name="probation_allowed">
+                    <input type="checkbox" id="probation_allowed" name="probation_allowed" value="1">
                     <label for="probation_allowed">Allow Volunteers on Probation</label>
                 </div>
 
@@ -1123,5 +1135,69 @@
     // Clear errors when modal is closed
     const _origClose = closeFacilityModal;
     closeFacilityModal = function() { clearAllErrors(); _origClose(); };
+
+    @if($errors->any())
+    // ── Re-open the Add Facility modal with old() values after a validation failure ──
+    (function () {
+        const form = document.getElementById('facilityForm');
+        document.getElementById('modalTitle').textContent = 'Add New Facility';
+        form.action  = '{{ route('facilities.store') }}';
+        document.getElementById('formMethod').value = 'POST';
+        document.getElementById('meetingScheduleSection').style.display = '';
+
+        // Repopulate basic fields
+        document.getElementById('name').value                    = @json(old('facility_name', ''));
+        document.getElementById('address').value                 = @json(old('address', ''));
+        document.getElementById('city').value                    = @json(old('city', ''));
+        document.getElementById('state').value                   = @json(old('state', ''));
+        document.getElementById('zip').value                     = @json(old('zip', ''));
+        document.getElementById('main_phone').value              = @json(old('main_phone', ''));
+        document.getElementById('contact_email').value           = @json(old('contact_email', ''));
+        document.getElementById('clean_time_requirement').value  = @json(old('clean_time_requirement', 0));
+        document.getElementById('contact1_name').value           = @json(old('contact1_name', ''));
+        document.getElementById('contact1_phone').value          = @json(old('contact1_phone', ''));
+        document.getElementById('contact1_email').value          = @json(old('contact1_email', ''));
+        document.getElementById('contact2_name').value           = @json(old('contact2_name', ''));
+        document.getElementById('contact2_phone').value          = @json(old('contact2_phone', ''));
+        document.getElementById('contact2_email').value          = @json(old('contact2_email', ''));
+
+        // Checkboxes
+        document.getElementById('gender_restriction').checked = @json(old('gender_restriction') ? true : false);
+        document.getElementById('probation_allowed').checked  = @json(old('probation_allowed') ? true : false);
+
+        // Credentialing type checkboxes
+        const oldCreds = @json(old('credentialing_types', []));
+        document.getElementById('cred_background').checked = oldCreds.includes('background_check');
+        document.getElementById('cred_reference').checked  = oldCreds.includes('reference_check');
+        document.getElementById('cred_training').checked   = oldCreds.includes('training_certification');
+        document.getElementById('cred_medical').checked    = oldCreds.includes('medical_exam');
+
+        // Rebuild meeting slots from old input
+        document.getElementById('meetingSlotsContainer').innerHTML = '';
+        slotCount = 0;
+        const oldSlots = @json(old('meetings', []));
+        if (oldSlots && oldSlots.length > 0) {
+            oldSlots.forEach(function (slot) {
+                const idx  = slotCount;
+                const html = buildSlotHTML(idx);
+                document.getElementById('meetingSlotsContainer').insertAdjacentHTML('beforeend', html);
+                slotCount++;
+                // Restore values
+                const el = id => document.querySelector(`[name="meetings[${idx}][${id}]"]`);
+                if (el('week_of_month'))    el('week_of_month').value    = slot.week_of_month    ?? 1;
+                if (el('day_of_week'))      el('day_of_week').value      = slot.day_of_week      ?? 0;
+                if (el('meeting_time'))     el('meeting_time').value     = slot.meeting_time     ?? '';
+                if (el('duration_minutes')) el('duration_minutes').value = slot.duration_minutes ?? 60;
+                if (el('format'))           el('format').value           = slot.format           ?? 'in_person';
+                if (el('volunteers_needed'))el('volunteers_needed').value= slot.volunteers_needed?? 1;
+            });
+        } else {
+            addMeetingSlot();
+        }
+        updateRemoveButtons();
+
+        document.getElementById('facilityModal').classList.add('show');
+    })();
+    @endif
 </script>
 @endsection

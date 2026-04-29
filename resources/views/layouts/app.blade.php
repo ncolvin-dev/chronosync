@@ -467,6 +467,15 @@
             <a class="navbar-brand mb-0" href="{{ route('home') }}" style="margin:0;">
                 <i class="fas fa-clock-list"></i> ChronoSync
             </a>
+            @auth
+                @php
+                    $volunteer   = \App\Models\Volunteer::where('email', auth()->user()->email)->first();
+                    $displayName = $volunteer?->first_name ?? auth()->user()->email;
+                @endphp
+                <span style="color:rgba(255,255,255,0.85);font-size:0.875rem;margin-left:auto;white-space:nowrap;">
+                    Welcome, {{ $displayName }}
+                </span>
+            @endauth
         </div>
     </nav>
 

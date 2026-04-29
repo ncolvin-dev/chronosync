@@ -9,26 +9,14 @@ use Illuminate\Database\Seeder;
 /**
  * MeetingSeeder — recurring weekly H&I meetings for each facility.
  *
- * Uses the recurring-pattern fields added by
- * 2024_01_04_100000_update_meetings_for_recurring_patterns.php:
- *   day_of_week   : 0=Sun 1=Mon 2=Tue 3=Wed 4=Thu 5=Fri 6=Sat
- *   week_of_month : null = every week, 1-4 = specific week
- *   meeting_time  : time string (HH:MM:SS)
- *   duration_minutes: always 60 unless noted
- *   scheduled_time  : null (pattern-based, not one-off)
- *
- * Gender notes (where a co-ed facility has gender-specific sessions)
- * are recorded in the 'notes' field. The meetings table has no
- * gender column — the facility-level gender_restriction flag governs
- * volunteer eligibility at the matching stage.
- *
- * ⚠️  ASSUMPTION: Glenwood Behavioral Health has no day specified →
- *      defaulted to Wednesday. Brookside Health Center has no day
- *      specified → defaulted to Thursday. Update if incorrect.
+ * Uses the recurring-pattern fields:
+ *   day_of_week    : 0=Sun 1=Mon 2=Tue 3=Wed 4=Thu 5=Fri 6=Sat
+ *   week_of_month  : 1-4 = specific week, 5 = last occurrence
+ *   meeting_time   : time string (HH:MM:SS)
+ *   scheduled_time : null  ← must be null for recurring meetings
  */
 class MeetingSeeder extends Seeder
 {
-    // Day-of-week constants (Carbon convention)
     const SUN = 0;
     const MON = 1;
     const TUE = 2;
@@ -45,92 +33,39 @@ class MeetingSeeder extends Seeder
         $communityCenter = Facility::where('facility_name', 'Community Center')->first();
         $youthDetention  = Facility::where('facility_name', 'Youth Detention Center')->first();
 
-        // Metro Hospital — Monday at 2pm (active)
-        Meeting::create([
-            'facility_id'      => $metroHospital?->facility_id,
-            'scheduled_time'   => Carbon::parse('next monday')->setTime(14, 0),
-            'duration_minutes' => 60,
-            'format'           => 'in_person',
-            'volunteers_needed'=> 2,
-            'status'           => 'active',
-            'notes'            => 'Metro Hospital Monday meeting',
-        ]);
+        $meetings = [
+            // Metro Hospital — every Monday at 2pm
+            ['facility' => $metroHospital,   'dow' => self::MON, 'wom' => null, 'time' => '14:00:00', 'volunteers' => 2, 'status' => 'active',   'notes' => 'Metro Hospital Monday meeting'],
+            // County Jail — every Wednesday at 7pm
+            ['facility' => $countyJail,      'dow' => self::WED, 'wom' => null, 'time' => '19:00:00', 'volunteers' => 2, 'status' => 'active',   'notes' => 'County Jail Wednesday meeting'],
+            // County Jail — every Friday at 7pm (inactive)
+            ['facility' => $countyJail,      'dow' => self::FRI, 'wom' => null, 'time' => '19:00:00', 'volunteers' => 1, 'status' => 'inactive', 'notes' => 'County Jail Friday meeting — currently suspended'],
+            // Springfield Treatment Center — every Thursday at 6pm
+            ['facility' => $treatmentCenter, 'dow' => self::THU, 'wom' => null, 'time' => '18:00:00', 'volunteers' => 2, 'status' => 'active',   'notes' => 'Treatment Center Thursday meeting'],
+            // Community Center — every Tuesday at 9am
+            ['facility' => $communityCenter, 'dow' => self::TUE, 'wom' => null, 'time' => '09:00:00', 'volunteers' => 3, 'status' => 'active',   'notes' => 'Community Center Tuesday morning meeting'],
+            // Community Center — every Friday at 5pm
+            ['facility' => $communityCenter, 'dow' => self::FRI, 'wom' => null, 'time' => '17:00:00', 'volunteers' => 2, 'status' => 'active',   'notes' => 'Community Center Friday afternoon meeting'],
+            // Youth Detention Center — every Monday at 3pm
+            ['facility' => $youthDetention,  'dow' => self::MON, 'wom' => null, 'time' => '15:00:00', 'volunteers' => 2, 'status' => 'active',   'notes' => 'Youth Detention Monday meeting'],
+            // Youth Detention Center — every Wednesday at 3pm (inactive)
+            ['facility' => $youthDetention,  'dow' => self::WED, 'wom' => null, 'time' => '15:00:00', 'volunteers' => 1, 'status' => 'inactive', 'notes' => 'Youth Detention Wednesday meeting — under review'],
+        ];
 
-        // County Jail — Wednesday at 7pm (active)
-        Meeting::create([
-            'facility_id'      => $countyJail?->facility_id,
-            'scheduled_time'   => Carbon::parse('next wednesday')->setTime(19, 0),
-            'duration_minutes' => 60,
-            'format'           => 'in_person',
-            'volunteers_needed'=> 2,
-            'status'           => 'active',
-            'notes'            => 'County Jail Wednesday meeting',
-        ]);
-
-        // County Jail — Friday at 7pm (inactive — facility temporarily unavailable)
-        Meeting::create([
-            'facility_id'      => $countyJail?->facility_id,
-            'scheduled_time'   => Carbon::parse('next friday')->setTime(19, 0),
-            'duration_minutes' => 60,
-            'format'           => 'in_person',
-            'volunteers_needed'=> 1,
-            'status'           => 'inactive',
-            'notes'            => 'County Jail Friday meeting — currently suspended',
-        ]);
-
-        // Springfield Treatment Center — Thursday at 6pm (active)
-        Meeting::create([
-            'facility_id'      => $treatmentCenter?->facility_id,
-            'scheduled_time'   => Carbon::parse('next thursday')->setTime(18, 0),
-            'duration_minutes' => 60,
-            'format'           => 'in_person',
-            'volunteers_needed'=> 2,
-            'status'           => 'active',
-            'notes'            => 'Treatment Center Thursday meeting',
-        ]);
-
-        // Community Center — Tuesday at 9am (active)
-        Meeting::create([
-            'facility_id'      => $communityCenter?->facility_id,
-            'scheduled_time'   => Carbon::parse('next tuesday')->setTime(9, 0),
-            'duration_minutes' => 60,
-            'format'           => 'in_person',
-            'volunteers_needed'=> 3,
-            'status'           => 'active',
-            'notes'            => 'Community Center Tuesday morning meeting',
-        ]);
-
-        // Community Center — Friday at 5pm (active)
-        Meeting::create([
-            'facility_id'      => $communityCenter?->facility_id,
-            'scheduled_time'   => Carbon::parse('next friday')->setTime(17, 0),
-            'duration_minutes' => 60,
-            'format'           => 'in_person',
-            'volunteers_needed'=> 2,
-            'status'           => 'active',
-            'notes'            => 'Community Center Friday afternoon meeting',
-        ]);
-
-        // Youth Detention Center — Monday at 3pm (active)
-        Meeting::create([
-            'facility_id'      => $youthDetention?->facility_id,
-            'scheduled_time'   => Carbon::parse('next monday')->setTime(15, 0),
-            'duration_minutes' => 60,
-            'format'           => 'in_person',
-            'volunteers_needed'=> 2,
-            'status'           => 'active',
-            'notes'            => 'Youth Detention Monday meeting',
-        ]);
-
-        // Youth Detention Center — Wednesday at 3pm (inactive — under review)
-        Meeting::create([
-            'facility_id'      => $youthDetention?->facility_id,
-            'scheduled_time'   => Carbon::parse('next wednesday')->setTime(15, 0),
-            'duration_minutes' => 60,
-            'format'           => 'in_person',
-            'volunteers_needed'=> 1,
-            'status'           => 'inactive',
-            'notes'            => 'Youth Detention Wednesday meeting — under review',
-        ]);
+        foreach ($meetings as $m) {
+            if (!$m['facility']) continue;
+            Meeting::create([
+                'facility_id'       => $m['facility']->facility_id,
+                'scheduled_time'    => null,          // null = recurring pattern
+                'day_of_week'       => $m['dow'],
+                'week_of_month'     => $m['wom'],
+                'meeting_time'      => $m['time'],
+                'duration_minutes'  => 60,
+                'format'            => 'in_person',
+                'volunteers_needed' => $m['volunteers'],
+                'status'            => $m['status'],
+                'notes'             => $m['notes'],
+            ]);
+        }
     }
 }
